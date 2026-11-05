@@ -1,6 +1,7 @@
 """Command line: python -m rsxp <command>"""
 import argparse
 import logging
+import os
 import sys
 import time
 from contextlib import closing
@@ -31,7 +32,8 @@ def need_player(conn, name):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="rsxp", description="RS3 XP gains tracker and planner")
-    ap.add_argument("--db", default=str(db.DEFAULT_DB), help="SQLite file (default: data/rsxp.sqlite3)")
+    ap.add_argument("--db", default=os.environ.get("RSXP_DB") or str(db.DEFAULT_DB),
+                    help="SQLite file (default: $RSXP_DB, else data/rsxp.sqlite3)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("add", help="track a player").add_argument("name")
     p = sub.add_parser("poll", help="fetch Hiscores now (one player, or all that are due)")

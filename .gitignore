@@ -13,3 +13,6 @@ venv/
 .claude/
 *.ahk
 marks.ini
+
+# Docker settings (has your contact)
+.env

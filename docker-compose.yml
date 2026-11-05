@@ -1,0 +1,19 @@
+services:
+  planner:
+    build: .
+    image: rs3-xp-planner
+    container_name: rs3-xp-planner
+    restart: unless-stopped
+    environment:
+      # Both come from .env next to this file (see .env.example).
+      RSXP_CONTACT: ${RSXP_CONTACT:?copy .env.example to .env and set RSXP_CONTACT}
+      RSXP_PLAYERS: ${RSXP_PLAYERS:-}
+    ports:
+      # The dashboard has no login, so it's only reachable from this machine.
+      # Change to "8765:8765" to open it to your network.
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - rsxp-data:/data
+
+volumes:
+  rsxp-data:

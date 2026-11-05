@@ -1,0 +1,5 @@
+# Only the app and its requirements go into the image.
+*
+!rsxp/
+!requirements.txt
+**/__pycache__

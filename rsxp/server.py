@@ -1,4 +1,6 @@
 """Local API + dashboard. The collector runs in a background thread while this is up."""
+import logging
+import os
 import threading
 import time
 from contextlib import asynccontextmanager, closing
@@ -18,11 +20,28 @@ class NewPlayer(BaseModel):
     name: str
 
 
+def seed_players(conn, names: str | None) -> list[str]:
+    """Track every name in a comma-separated list (the RSXP_PLAYERS setting). Names that
+    are already tracked are left alone; invalid ones are logged and skipped."""
+    added = []
+    for name in (names or "").split(","):
+        if not name.strip():
+            continue
+        try:
+            pid = db.add_player(conn, name)
+            added.append(db.get_player(conn, pid)["display_name"])
+        except ValueError as exc:
+            logging.getLogger("rsxp").warning("RSXP_PLAYERS: skipping %r: %s", name.strip(), exc)
+    return added
+
+
 def create_app(db_path=db.DEFAULT_DB, collect: bool = True) -> FastAPI:
     stop = threading.Event()
 
     @asynccontextmanager
     async def lifespan(app):
+        with closing(db.connect(db_path)) as conn:
+            seed_players(conn, os.environ.get("RSXP_PLAYERS"))
         if collect:
             threading.Thread(target=collector.loop, args=(db_path, stop), daemon=True,
                              name="collector").start()
@@ -92,14 +111,15 @@ def create_app(db_path=db.DEFAULT_DB, collect: bool = True) -> FastAPI:
 
     @app.get("/api/players/{pid}/training")
     def training_plan(pid: int, target: str = "120", mode: str = "fastest", avatar: int = 0,
-                      outfit: bool = False, portable: bool = False, double: bool = False,
+                      outfits: str = "", portables: str = "", double: bool = False,
                       expensive: bool = False):
         if target not in TARGETS or mode not in training.MODES or avatar not in (0, 3, 6):
             raise HTTPException(422, f"target must be one of {TARGETS}, mode one of {training.MODES}, avatar 0, 3 or 6")
         with open_db() as conn:
             player_or_404(conn, pid)
             latest = {sid: dict(r) for sid, r in db.latest_skills(conn, pid).items()}
-        boosts = {"avatar": avatar, "outfit": outfit, "portable": portable, "double": double}
+        names = lambda csv: [n.strip() for n in csv.split(",") if n.strip()]
+        boosts = {"avatar": avatar, "outfits": names(outfits), "portables": names(portables), "double": double}
         return training.plan(latest, target, mode, boosts, expensive)
 
     @app.get("/api/players/{pid}/activities")

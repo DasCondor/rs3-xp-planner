@@ -63,10 +63,10 @@ def export(conn, player_name: str, out: Path, display_as: str | None = "Demo Pla
                 write(f"training-{target}-{mode}-{tag}", training.plan(latest, target, mode, {}, expensive, doc))
 
     config = json.dumps({"base": "data/", "repo": repo})
-    html = STATIC.read_text(encoding="utf-8").replace(
-        "<title>RS3 XP Planner</title>",
-        "<title>RS3 XP Planner · Demo</title>\n"
-        f"<script>window.RSXP_STATIC = {config};</script>", 1)
+    html = STATIC.read_text(encoding="utf-8")
+    if "</title>" not in html:
+        raise SystemExit("static/index.html has no <title>; can't inject the demo config")
+    html = html.replace("</title>", f" (demo)</title>\n<script>window.RSXP_STATIC = {config};</script>", 1)
     (out / "index.html").write_text(html, encoding="utf-8")
     (out / ".nojekyll").write_text("", encoding="utf-8")
     return files

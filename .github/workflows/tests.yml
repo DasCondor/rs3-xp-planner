@@ -15,3 +15,24 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install -r requirements.txt pytest
       - run: python -m pytest -q tests
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t rs3-xp-planner .
+      - name: Start container (no players, so it never calls Jagex)
+        run: docker run -d --name planner -p 8765:8765 -e RSXP_CONTACT=ci-smoke-test rs3-xp-planner
+      - name: Wait for the dashboard
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fs http://127.0.0.1:8765/api/players >/dev/null; then break; fi
+            sleep 2
+          done
+          curl -fs http://127.0.0.1:8765/api/players
+          curl -fs http://127.0.0.1:8765/ | grep -q "rs3 xp planner"
+          docker exec planner python -m rsxp --help >/dev/null
+      - name: Logs
+        if: always()
+        run: docker logs planner

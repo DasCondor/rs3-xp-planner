@@ -25,14 +25,23 @@ def load_methods(path: Path = METHODS_FILE) -> dict[str, list[dict]]:
     return load(path)["skills"]
 
 
+def per_skill(cfg: dict) -> dict[str, dict]:
+    """The outfits/portables tables without their _about note."""
+    return {k: v for k, v in cfg.items() if not k.startswith("_")}
+
+
 def multiplier(skill: str, boosts: dict, doc: dict) -> float:
-    """Avatar and portables multiply; Double XP doubles; outfit only for non-combat skills."""
+    """Clan avatar, the skill's outfit and its portable each multiply; Double XP doubles.
+    boosts["outfits"] / boosts["portables"] list the skills you have them for; skills
+    without an outfit or portable in methods.json are ignored."""
     cfg = doc.get("boosts", {})
     mult = 1 + (boosts.get("avatar") or 0) / 100
-    if boosts.get("outfit") and skill not in doc.get("combat_skills", []):
-        mult *= 1 + cfg["outfit"]["percent"] / 100
-    if boosts.get("portable") and skill in cfg["portable"]["applies"]:
-        mult *= 1 + cfg["portable"]["percent"] / 100
+    outfit = per_skill(cfg.get("outfits", {})).get(skill)
+    if outfit and skill in (boosts.get("outfits") or ()):
+        mult *= 1 + outfit["percent"] / 100
+    portable = per_skill(cfg.get("portables", {})).get(skill)
+    if portable and skill in (boosts.get("portables") or ()):
+        mult *= 1 + portable["percent"] / 100
     if boosts.get("double"):
         mult *= 1 + cfg["double"]["percent"] / 100
     return mult

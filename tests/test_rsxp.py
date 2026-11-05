@@ -305,11 +305,25 @@ def test_expensive_and_unrated_methods_are_skipped():
 def test_boost_multiplier():
     doc = training.load()
     assert training.multiplier("Cooking", {}, doc) == 1
-    assert training.multiplier("Cooking", {"avatar": 6, "outfit": True, "portable": True}, doc) == pytest.approx(1.06 * 1.06 * 1.10)
-    assert training.multiplier("Attack", {"avatar": 6, "outfit": True, "portable": True}, doc) == pytest.approx(1.06)
+    # outfit and portable only count for the skills you pick, at that skill's own rate
+    b = {"avatar": 6, "outfits": ["Cooking", "Woodcutting"], "portables": ["Cooking"]}
+    assert training.multiplier("Cooking", b, doc) == pytest.approx(1.06 * 1.06 * 1.21)
+    assert training.multiplier("Woodcutting", b, doc) == pytest.approx(1.06 * 1.05)
+    assert training.multiplier("Fishing", b, doc) == pytest.approx(1.06)
+    # Attack has no outfit and Smithing no portable, so asking for them changes nothing
+    assert training.multiplier("Attack", {"outfits": ["Attack"]}, doc) == 1
+    assert training.multiplier("Smithing", {"portables": ["Smithing"]}, doc) == 1
     assert training.multiplier("Mining", {"double": True}, doc) == pytest.approx(2)
     r = training.route(1, 0, XP_TABLE[40], METHODS, "fastest", mult=2)   # "basic" 20k/hr, doubled
     assert r["hours"] == pytest.approx(XP_TABLE[40] / 40_000) and r["segments"][0]["xp_hr"] == 40_000
+
+
+def test_boost_tables_name_real_skills():
+    from rsxp.xp import SKILLS
+    doc = training.load()
+    for table in ("outfits", "portables"):
+        for skill, v in training.per_skill(doc["boosts"][table]).items():
+            assert skill in SKILLS and 0 < v["percent"] <= 25 and v["item"], (table, skill)
 
 
 # --- static demo export -------------------------------------------------------
@@ -328,3 +342,21 @@ def test_export_demo_hides_real_name(conn, tmp_path):
         assert "secret" not in f.read_text(encoding="utf-8").lower(), f.name
     summary = json.loads((tmp_path / "data" / "summary-30.json").read_text())
     assert summary["player"]["display_name"] == "Demo Player" and summary["skills"][1]["xp"] == 1_500_000
+
+
+# --- docker / env settings ------------------------------------------------------
+
+def test_seed_players_from_env(conn):
+    from rsxp.server import seed_players
+    assert seed_players(conn, "Zezima, mod_example ,,this name is far too long") == ["Zezima", "mod example"]
+    assert seed_players(conn, "zezima") == ["Zezima"]                # already tracked: no duplicate
+    assert len(db.players(conn)) == 2
+    assert seed_players(conn, None) == []
+
+
+def test_db_path_from_env(monkeypatch, tmp_path):
+    from rsxp import __main__ as cli
+    target = tmp_path / "x" / "planner.sqlite3"
+    monkeypatch.setenv("RSXP_DB", str(target))
+    cli.main(["add", "Zezima"])
+    assert target.exists()
