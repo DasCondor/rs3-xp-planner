@@ -175,6 +175,10 @@ flowchart LR
   and every level-up is an exact XP point with a timestamp. That gives each skill some
   history from before you started tracking. These gains are marked `*`, because the log
   only keeps your latest events and sometimes batches level-ups.
+- **Monthly history you already saved (optional).** If your database has month-start
+  totals saved from RuneMetrics before it closed on 10 Nov 2026, they're used too. That
+  gives up to a year of history. They're read from your local file, never fetched, and are
+  approximate inside each month.
 
 **Where the ETAs come from:** your own recent pace, the training routes, or an XP/hr you
 type in. You pick which on the page.
@@ -251,8 +255,8 @@ Everything goes through one client ([`rsxp/client.py`](rsxp/client.py)):
 
 **Why does my history only start today?**
 The API has no history endpoint, so the planner only knows what it has seen. Each skill
-does get some older points from your Adventurer's Log milestones. Leave it running and
-it fills in.
+does get some older points from your Adventurer's Log milestones, and any monthly history
+already in your database is used too. Leave it running and it fills in.
 
 **Why does a skill say "no recent XP"?**
 Recent-pace ETAs need at least a day of history with some XP in it. Switch the pace to

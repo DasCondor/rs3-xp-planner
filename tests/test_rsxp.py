@@ -85,16 +85,20 @@ def test_history_from_adventurers_log(conn):
     assert gains.gain(s[5], ts(2026, 10, 26), ts(2026, 11, 2))[0] > 0
 
 
-def test_history_ignores_old_runemetrics_rows_and_never_dips(conn):
+def test_history_uses_imported_monthly_rows_and_never_dips(conn):
     pid = db.add_player(conn, "Test")
-    conn.execute("INSERT INTO snapshots(player_id, taken_at, seen_until, source) VALUES (?, 100, 100, 'runemetrics')", (pid,))
-    conn.execute("INSERT INTO snapshot_skills VALUES (last_insert_rowid(), 1, 5, NULL, NULL)")
+    # a month-start total saved from RuneMetrics before it closed
+    conn.execute("INSERT INTO snapshots(player_id, taken_at, seen_until, source) VALUES (?, ?, ?, 'runemetrics')",
+                 (pid, ts(2026, 10, 1), ts(2026, 10, 1)))
+    conn.execute("INSERT INTO snapshot_skills VALUES (last_insert_rowid(), 1, 40000000, NULL, NULL)")
     db.save_hiscores(conn, pid, hiscores_payload({0: 50_000_000, 1: 50_000_000}), now=ts(2026, 11, 5))
     # a batched level-up dated after the snapshot, with less XP than the snapshot shows
     db.save_events(conn, pid, {"events": [{"date": "2026-11-06T00:00:00Z", "type": "rs_plog_levelup_count",
         "text": "Levelled up Attack.", "details": "I levelled my Attack skill, I am now level 99."}]})
     pts = gains.load_series(conn, pid)[1]
-    assert pts == [(ts(2026, 11, 5), 50_000_000)]
+    assert pts == [(ts(2026, 10, 1), 40_000_000), (ts(2026, 11, 5), 50_000_000)]
+    s = planner.summary(conn, pid, ts(2026, 11, 5, 12), 30)
+    assert s["estimated"]["month"] is True and s["history_starts"] == ts(2026, 10, 1)
 
 
 # --- gains ----------------------------------------------------------------

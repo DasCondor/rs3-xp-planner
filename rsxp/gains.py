@@ -1,11 +1,14 @@
-"""XP-over-time queries, using only data from the RuneScape Platform API.
+"""XP-over-time queries. The only API called is the RuneScape Platform API.
 
-Each skill's history is a list of (time, xp) points from two sources:
+Each skill's history is a list of (time, xp) points from up to three sources:
   * Hiscores snapshots (hourly while the planner runs): exact.
   * Adventurer's Log events: every 2M XP milestone ("70000000XP in Construction") and
     level-up ("I am now level 116") is an XP point at that moment. These reach back
     before you started tracking, but only as far as the log does, and level-ups can be
     batched, so they're treated as approximate.
+  * Imported monthly history already saved in the database (month-start totals from
+    RuneMetrics, saved before it closed on 10 Nov 2026). Nothing new is ever fetched
+    for it; it's read from the local file, and is approximate inside each month.
 XP between points is linearly interpolated.
 """
 import bisect
@@ -50,7 +53,8 @@ def load_series(conn, pid: int) -> dict[int, list[tuple[int, int]]]:
     for taken, seen, sid, xp in conn.execute(
             "SELECT s.taken_at, s.seen_until, k.skill_id, k.xp FROM snapshots s "
             "JOIN snapshot_skills k ON k.snapshot_id = s.id "
-            "WHERE s.player_id=? AND s.source='hiscores' AND k.xp >= 0 ORDER BY s.taken_at, s.id", (pid,)):
+            "WHERE s.player_id=? AND s.source IN ('hiscores', 'runemetrics') AND k.xp >= 0 "
+            "ORDER BY s.taken_at, s.id", (pid,)):
         series[sid].append((taken, xp))
         if seen > taken:
             series[sid].append((seen, xp))

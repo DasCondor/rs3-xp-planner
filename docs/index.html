@@ -514,12 +514,12 @@ function renderTable() {
   $("#th-pace").classList.toggle("r", !isMethods());
   $("#th-goal").textContent = "To " + state.target;
   $("#th-gain").textContent = periodLabel() + (d.estimated[state.period] ? "*" : "");
-  $("#th-gain").title = d.estimated[state.period] ? "Partly from Adventurer's Log milestones, so approximate" : "";
+  $("#th-gain").title = d.estimated[state.period] ? "Partly from imported monthly history and Adventurer's Log milestones, so approximate" : "";
   $("#table-note").innerHTML = '<span class="legend"><b class="c-combat">combat</b><b class="c-gathering">gathering</b>'
     + '<b class="c-artisan">artisan</b><b class="c-support">support</b><b class="c-elite">elite</b></span>'
     + ' &nbsp;·&nbsp; gold bar = there &nbsp;·&nbsp; (99) = real level, hiscores cap it'
     + (usesHours() ? ` &nbsp;·&nbsp; eta = all ${hours()} h/wk on that one skill` : "")
-    + (d.estimated[state.period] ? " &nbsp;·&nbsp; * before tracking started, from Adventurer's Log milestones, so approximate" : "");
+    + (d.estimated[state.period] ? " &nbsp;·&nbsp; * before tracking started: from imported monthly history and Adventurer's Log milestones, so approximate" : "");
   $("#rows").innerHTML = rows.map(r => {
     const t = r.t, done = t && t.remaining === 0;
     const now = r.route && r.route.now;
@@ -572,7 +572,7 @@ function renderKpis() {
   ].filter(Boolean).map(x => `<span>${x}</span>`).join("");
   const since = d.history_starts ? new Date(d.history_starts * 1000).toLocaleDateString(undefined, { month: "short", year: "numeric" }) : null;
   const g = p => (o.gains[p] == null ? "–" : "+" + short(o.gains[p]));
-  const star = p => (d.partial[p] && since ? `<sup title="history starts ${since}">*</sup>` : d.estimated[p] ? `<sup title="partly from Adventurer's Log milestones, so approximate">*</sup>` : "");
+  const star = p => (d.partial[p] && since ? `<sup title="history starts ${since}">*</sup>` : d.estimated[p] ? `<sup title="partly from imported monthly history and Adventurer's Log milestones, so approximate">*</sup>` : "");
   const cell = (lbl, p, tip) => `<div title="${tip}"><dt>${lbl}</dt><dd>${g(p)}${star(p)}</dd></div>`;
   $("#kpis").innerHTML = cell("today", "day", "since 00:00 UTC") + cell("this week", "week", "since the Wednesday reset")
     + cell("this month", "month", "") + cell("this year", "year", "");

@@ -27,8 +27,8 @@ CREATE TABLE IF NOT EXISTS snapshots(
   player_id INTEGER NOT NULL REFERENCES players(id),
   taken_at INTEGER NOT NULL,
   seen_until INTEGER NOT NULL,
-  source TEXT NOT NULL                          -- hiscores (older installs may also have
-                                                -- 'runemetrics' rows; those are ignored)
+  source TEXT NOT NULL                          -- hiscores, or 'runemetrics' for monthly
+                                                -- history imported before RuneMetrics closed
 );
 CREATE INDEX IF NOT EXISTS snapshots_player_time ON snapshots(player_id, taken_at);
 CREATE TABLE IF NOT EXISTS snapshot_skills(

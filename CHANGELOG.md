@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Up to a year of history again. Monthly totals saved from RuneMetrics before it closed are
+  read from your local database (nothing is fetched). They join hourly Hiscores snapshots
+  and Adventurer's Log milestones.
+- `.gitattributes` keeps line endings consistent. `docker-compose.override.yml` is
+  gitignored for per-machine tweaks, like mounting an existing `./data` folder.
+
 ## v0.2.0 (November 2026)
 
 ### Highlights
