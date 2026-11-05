@@ -21,3 +21,6 @@ marks.ini
 /design/
 
 page.js
+
+# Per-machine Docker tweaks
+docker-compose.override.yml
