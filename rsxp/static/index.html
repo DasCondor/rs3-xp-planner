@@ -100,6 +100,8 @@ td input{width:90px;padding:3px 6px;text-align:right}
 .tabs button{padding:4px 10px;font-size:12.5px;border-radius:999px}
 .tabs button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
 .panel table td,.panel table th{padding:7px 16px}
+.lower table td,.lower table th{padding:7px 10px}
+.lower table td:first-child,.lower table th:first-child{padding-left:16px;white-space:normal}
 .method{display:inline-block;max-width:230px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
 .routes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
 @media (max-width:800px){.routes{grid-template-columns:minmax(0,1fr)}}
@@ -660,7 +662,9 @@ function renderQuests() {
     $("#qp").innerHTML = '<p class="empty" style="padding:0">Quest data appears after the next check (every 6 hours).</p>';
     $("#quest-tabs").innerHTML = ""; $("#quests").innerHTML = ""; return;
   }
-  $("#quests-checked").textContent = "checked " + ago(q.checked_at);
+  $("#quests-checked").textContent = STATIC && q.checked_at
+    ? "as of " + new Date(q.checked_at * 1000).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+    : "checked " + ago(q.checked_at);
   $("#qp").innerHTML = `<div class="row" style="display:flex;justify-content:space-between;align-items:baseline">
       <span><span class="big num">${q.qp}</span> <span class="dim">/ ${q.qp_max} quest points</span></span>
       <span class="dim num">${((q.qp / q.qp_max) * 100).toFixed(1)}%</span></div>
