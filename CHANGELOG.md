@@ -1,32 +1,49 @@
 # Changelog
 
-## Unreleased
+## v0.2.0 (November 2026)
 
-- Only the RuneScape Platform API is used now. RuneMetrics is discontinued on 10 Nov 2026, so
-  the backfill script and the `import-backfill` command are gone. History comes from hourly
-  Hiscores snapshots plus your Adventurer's Log: every 2M XP milestone and level-up is an XP
-  point. Old imported RuneMetrics rows are ignored.
-- Charts show per-day bars while history is short, and the Total XP axis uses day ticks.
-  `#woodcutting` (or any skill) in the address opens that skill.
+### Highlights
+
+- **Docker.** `docker compose up -d` runs the planner 24/7 and keeps your history in a
+  volume. Set `RSXP_CONTACT` and `RSXP_PLAYERS` in `.env` (copy `.env.example`).
+- **Only the RuneScape Platform API.** RuneMetrics is discontinued on 10 Nov 2026, so nothing
+  depends on it any more. History comes from hourly Hiscores snapshots plus your
+  Adventurer's Log: every 2M XP milestone and level-up is an XP point.
+- **Per-skill outfits and portables.** Pick the ones you own. Only skills that have one are
+  listed, each at its real bonus: 5-6% for outfits, 21% for the portable range, 10% for the
+  other portables.
+- **A new look.** A skill-sheet layout with skill-group colours on names, bars and charts,
+  plus a light/dark/auto theme switch.
+
+### Changed
+
 - The default pace is now Fastest methods, so a fresh install has ETAs straight away.
-- A clearer skills summary line, and ETAs over 50 years show as "50+ yr".
-- CI syntax-checks the dashboard script.
-- Docker: `Dockerfile` and `docker-compose.yml`. `docker compose up -d` runs the planner
-  24/7, with history kept in a volume.
-- New settings: `RSXP_PLAYERS` tracks names on startup, and `RSXP_DB` sets where the
-  database lives.
-- CI builds the Docker image and smoke-tests it.
-- Dashboard redesign: a skill-sheet layout, game-style labels and skill-group colours on
-  names, bars and charts.
-- Outfits and portables are picked per skill, and only skills that have one are listed.
-  Each uses its real bonus: 5-6% for outfits, the portable range 21%, other portables 10%.
-  There is no Smithing portable any more.
-- Theme switch in the top bar: auto, light or dark, remembered per browser.
-- Easier reading: clearer column headers, darker text in the light theme, and a tidier
-  "not counted above" box. Quests and the Adventurer's Log show 8 entries with a "show
-  all" link instead of scroll boxes.
-- Fix: charts no longer spill out of their panels after the window is resized.
-- Fix: the demo export no longer depends on the page title.
+- Charts show per-day bars while history is short. `#woodcutting` (or any skill) in the
+  address opens that skill.
+- A clearer skills summary line, clearer column headers and darker text in the light theme.
+  ETAs over 50 years show as "50+ yr".
+- "Gold sinks" are now called **Pricey Options** and are grouped on one line per route.
+- Quests and the Adventurer's Log show 8 entries with a "show all" link instead of scroll
+  boxes.
+- New settings: `RSXP_PLAYERS` and `RSXP_DB`.
+- CI builds and smoke-tests the Docker image, and syntax-checks the dashboard script.
+
+### Removed
+
+- `runemetrics_backfill.py` and the `import-backfill` command.
+
+### Fixed
+
+- Charts no longer spill out of their panels after the window is resized.
+- Smithing no longer gets a portable bonus (the portable forge was removed from the game).
+- The demo no longer fails to load on GitHub Pages.
+
+### Upgrading from v0.1.0
+
+- Your database carries over as it is. Snapshots imported from RuneMetrics are kept but no
+  longer read.
+- Outfit and portable choices are now per skill, so tick yours again under **Boosts → outfits
+  & portables**.
 
 ## v0.1.0 (November 2026)
 
