@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The "99" logo is shown in the top bar and used as the browser-tab icon.
 - Up to a year of history again. Monthly totals saved from RuneMetrics before it closed are
   read from your local database (nothing is fetched). They join hourly Hiscores snapshots
   and Adventurer's Log milestones.

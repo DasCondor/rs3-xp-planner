@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>rs3 xp planner (demo)</title>
 <script>window.RSXP_STATIC = {"base": "data/", "repo": "auto"};</script>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%274%27 fill=%27%231f6b63%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27Arial%27 font-weight=%27700%27 font-size=%2716%27 fill=%27%23e4b84f%27 text-anchor=%27middle%27%3E99%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"%3E %3Crect width="96" height="96" rx="14" fill="%231f6b63"/%3E %3Crect x="7" y="7" width="82" height="82" rx="9" fill="none" stroke="%23e4b84f" stroke-width="3"/%3E %3Ctext x="48" y="61" font-family="Bahnschrift%2C 'Arial Narrow'%2C Arial%2C sans-serif" font-weight="700" font-size="40" fill="%23e4b84f" text-anchor="middle"%3E99%3C/text%3E %3Crect x="22" y="70" width="52" height="5" fill="%230f3d38"/%3E %3Crect x="22" y="70" width="38" height="5" fill="%23e4b84f"/%3E %3C/svg%3E">
 <script>try{const t=JSON.parse(localStorage.getItem("rsxp.theme"));if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch{}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -122,6 +122,8 @@ td.sk{color:var(--c,var(--ink));font-weight:600}
 .legend b{color:var(--c);font-weight:600;margin-right:10px}
 .gains sup{font-size:14px;color:var(--muted);margin-left:2px}
 .status{font-family:var(--f-head)}
+.mark{display:inline-flex;align-items:center;gap:8px}
+.mark svg{width:24px;height:24px;flex:none;display:block}
 .meta .pill{font:inherit;letter-spacing:0;text-transform:none}
 td input{width:96px;padding:2px 6px;text-align:right}
 .method{display:inline-block;max-width:250px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
@@ -209,7 +211,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
 </head>
 <body>
 <div class="topbar"><div class="topbar-in">
-  <span class="mark">rs3 xp planner</span>
+  <span class="mark"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" viewBox="0 0 96 96"> <rect width="96" height="96" rx="14" fill="#1f6b63"/> <rect x="7" y="7" width="82" height="82" rx="9" fill="none" stroke="#e4b84f" stroke-width="3"/> <text x="48" y="61" font-family="Bahnschrift, 'Arial Narrow', Arial, sans-serif" font-weight="700" font-size="40" fill="#e4b84f" text-anchor="middle">99</text> <rect x="22" y="70" width="52" height="5" fill="#0f3d38"/> <rect x="22" y="70" width="38" height="5" fill="#e4b84f"/> </svg><span>rs3 xp planner</span></span>
   <span class="status" id="status"></span>
   <button id="theme" type="button" title="Switch theme">theme: auto</button>
   <span class="actions">
