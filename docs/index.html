@@ -1011,7 +1011,8 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
       const name = location.pathname.split("/").filter(Boolean)[0];
       repo = name ? `https://github.com/${location.hostname.split(".")[0]}/${name}` : null;
     } else if (repo === "auto") repo = null;
-    if (repo) $(".actions").innerHTML = `<a href="${esc(repo)}">Source on GitHub</a>`;
+    // append, don't replace: the (hidden) update/track controls must stay in the page
+    if (repo) $(".actions").insertAdjacentHTML("beforeend", `<a href="${esc(repo)}">Source on GitHub</a>`);
   }
   renderControls();
   renderBoostControls();
