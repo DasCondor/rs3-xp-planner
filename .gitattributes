@@ -1,0 +1,9 @@
+# Store text files with LF line endings, whatever OS they were edited on.
+* text=auto eol=lf
+
+# Windows batch files need CRLF to run reliably.
+*.bat text eol=crlf
+
+# Binary files: never touch.
+*.png binary
+*.sqlite3 binary
