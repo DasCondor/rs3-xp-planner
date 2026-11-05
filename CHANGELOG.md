@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Only the RuneScape Platform API is used now. RuneMetrics is discontinued on 10 Nov 2026, so
+  the backfill script and the `import-backfill` command are gone. History comes from hourly
+  Hiscores snapshots plus your Adventurer's Log: every 2M XP milestone and level-up is an XP
+  point. Old imported RuneMetrics rows are ignored.
+- Charts show per-day bars while history is short, and the Total XP axis uses day ticks.
+  `#woodcutting` (or any skill) in the address opens that skill.
+- The default pace is now Fastest methods, so a fresh install has ETAs straight away.
+- A clearer skills summary line, and ETAs over 50 years show as "50+ yr".
+- CI syntax-checks the dashboard script.
 - Docker: `Dockerfile` and `docker-compose.yml`. `docker compose up -d` runs the planner
   24/7, with history kept in a volume.
 - New settings: `RSXP_PLAYERS` tracks names on startup, and `RSXP_DB` sets where the

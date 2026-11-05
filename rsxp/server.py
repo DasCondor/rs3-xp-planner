@@ -103,7 +103,7 @@ def create_app(db_path=db.DEFAULT_DB, collect: bool = True) -> FastAPI:
             player_or_404(conn, pid)
             pts = gains.load_series(conn, pid).get(sid, [])
             return {"skill": SKILLS[sid], "history": gains.downsample(pts),
-                    "monthly": gains.monthly(pts, int(time.time()))}
+                    "monthly": gains.monthly(pts, int(time.time())), "daily": gains.daily(pts, int(time.time()))}
 
     @app.get("/api/training/boosts")
     def training_boosts():

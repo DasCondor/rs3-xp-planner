@@ -1,5 +1,4 @@
-"""SQLite storage: players, XP snapshots, Adventurer's Log events, RuneMetrics import."""
-import json
+"""SQLite storage: players, XP snapshots, activities, quests and Adventurer's Log events."""
 import re
 import sqlite3
 import time
@@ -28,7 +27,8 @@ CREATE TABLE IF NOT EXISTS snapshots(
   player_id INTEGER NOT NULL REFERENCES players(id),
   taken_at INTEGER NOT NULL,
   seen_until INTEGER NOT NULL,
-  source TEXT NOT NULL                          -- hiscores | runemetrics
+  source TEXT NOT NULL                          -- hiscores (older installs may also have
+                                                -- 'runemetrics' rows; those are ignored)
 );
 CREATE INDEX IF NOT EXISTS snapshots_player_time ON snapshots(player_id, taken_at);
 CREATE TABLE IF NOT EXISTS snapshot_skills(
@@ -232,50 +232,3 @@ def save_events(conn, pid: int, data: dict) -> int:
         "INSERT OR IGNORE INTO events(player_id, date, type, text, details) VALUES (?,?,?,?,?)", rows)
     conn.commit()
     return cur.rowcount
-
-
-def _month_start(ts: int) -> int:
-    d = datetime.fromtimestamp(ts, tz=timezone.utc)
-    return int(datetime(d.year, d.month, 1, tzinfo=timezone.utc).timestamp())
-
-
-def import_runemetrics(conn, pid: int, folder: Path | str) -> int:
-    """Turn saved xp-monthly responses into cumulative-XP snapshots at each month start.
-
-    Each response gives current total XP and 12 monthly gains (the newest month runs to
-    the fetch time), so XP at the start of month m = total - gains of months >= m.
-    Re-importing replaces the previous import. Returns snapshots written.
-    """
-    folder = Path(folder)
-    per_skill, fetched_at = {}, 0
-    for sid in SKILL_IDS:
-        f = folder / f"skill_{sid - 1}.json"
-        if not f.exists():
-            raise FileNotFoundError(f"missing {f}; run runemetrics_backfill.py first")
-        entry = json.loads(f.read_text())["monthlyXpGain"][0]
-        gains = {}
-        for m in entry.get("monthData", []):
-            ts = int(m["timestamp"] / 1000)
-            fetched_at = max(fetched_at, ts)
-            gains[_month_start(ts)] = gains.get(_month_start(ts), 0) + int(m["xpGain"])
-        per_skill[sid] = (int(entry["totalXp"]), gains)
-    if not fetched_at:
-        fetched_at = int(min(f.stat().st_mtime for f in folder.glob("skill_*.json")))
-
-    months = sorted({m for _, g in per_skill.values() for m in g})
-    points = {fetched_at: {sid: total for sid, (total, _) in per_skill.items()}}
-    for m in months:
-        points[m] = {sid: total - sum(v for k, v in g.items() if k >= m)
-                     for sid, (total, g) in per_skill.items()}
-
-    conn.execute("DELETE FROM snapshot_skills WHERE snapshot_id IN "
-                 "(SELECT id FROM snapshots WHERE player_id=? AND source='runemetrics')", (pid,))
-    conn.execute("DELETE FROM snapshots WHERE player_id=? AND source='runemetrics'", (pid,))
-    for ts, xps in sorted(points.items()):
-        cur = conn.execute("INSERT INTO snapshots(player_id, taken_at, seen_until, source) "
-                           "VALUES (?,?,?,'runemetrics')", (pid, ts, ts))
-        rows = [(cur.lastrowid, sid, xp, None, None) for sid, xp in xps.items()]
-        rows.append((cur.lastrowid, 0, sum(xps.values()), None, None))
-        conn.executemany("INSERT INTO snapshot_skills VALUES (?,?,?,?,?)", rows)
-    conn.commit()
-    return len(points)

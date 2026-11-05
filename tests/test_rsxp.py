@@ -67,23 +67,34 @@ def test_snapshot_dedupe_moves_seen_until(conn):
     assert gains.xp_at(pts, 6400) == 15
 
 
-def test_import_runemetrics(conn, tmp_path):
+def test_history_from_adventurers_log(conn):
     pid = db.add_player(conn, "Test")
-    fetched = ts(2026, 11, 5, 1) * 1000
-    for rm_id in range(len(SKILL_IDS)):
-        if rm_id == 0:   # Attack: gains in Oct and Nov
-            data = {"monthlyXpGain": [{"skillId": 0, "totalXp": 1000, "monthData": [
-                {"xpGain": 100, "timestamp": ts(2026, 10, 5) * 1000, "rank": 1},
-                {"xpGain": 50, "timestamp": fetched, "rank": 1}]}]}
-        else:            # capped skill style: no month data
-            data = {"monthlyXpGain": [{"skillId": rm_id, "totalXp": MAX_XP, "monthData": []}]}
-        (tmp_path / f"skill_{rm_id}.json").write_text(json.dumps(data))
-    assert db.import_runemetrics(conn, pid, tmp_path) == 3
+    db.save_events(conn, pid, {"events": [
+        {"date": "2026-10-25T23:23:22Z", "type": "rs_plog_xp_milestone", "text": "78000000XP in Ranged",
+         "details": "I now have at least 78000000 experience points in the Ranged skill."},
+        {"date": "2026-11-01T13:50:36Z", "type": "rs_plog_xp_milestone", "text": "80000000XP in Ranged", "details": ""},
+        {"date": "2026-11-03T23:47:59Z", "type": "rs_plog_levelup_count", "text": "Levelled up Construction.",
+         "details": "I levelled my Construction skill, I am now level 116."},
+        {"date": "2026-11-05T14:25:12+00:00", "type": "rs_plog_xp_milestone", "text": "144000000XP in Constitution", "details": ""},
+        {"date": "2026-11-04T10:00:00Z", "type": "rs_plog_quest", "text": "Quest complete: Cold Front", "details": ""},
+    ]})
+    s = gains.load_series(conn, pid)
+    assert s[5] == [(ts(2026, 10, 25, 23, 23, 22), 78_000_000), (ts(2026, 11, 1, 13, 50, 36), 80_000_000)]
+    assert s[23] == [(ts(2026, 11, 3, 23, 47, 59), XP_TABLE[116])]          # level-up -> XP threshold
+    assert s[4][0][1] == 144_000_000                                          # Constitution -> Hitpoints
+    assert gains.gain(s[5], ts(2026, 10, 26), ts(2026, 11, 2))[0] > 0
+
+
+def test_history_ignores_old_runemetrics_rows_and_never_dips(conn):
+    pid = db.add_player(conn, "Test")
+    conn.execute("INSERT INTO snapshots(player_id, taken_at, seen_until, source) VALUES (?, 100, 100, 'runemetrics')", (pid,))
+    conn.execute("INSERT INTO snapshot_skills VALUES (last_insert_rowid(), 1, 5, NULL, NULL)")
+    db.save_hiscores(conn, pid, hiscores_payload({0: 50_000_000, 1: 50_000_000}), now=ts(2026, 11, 5))
+    # a batched level-up dated after the snapshot, with less XP than the snapshot shows
+    db.save_events(conn, pid, {"events": [{"date": "2026-11-06T00:00:00Z", "type": "rs_plog_levelup_count",
+        "text": "Levelled up Attack.", "details": "I levelled my Attack skill, I am now level 99."}]})
     pts = gains.load_series(conn, pid)[1]
-    assert pts == [(ts(2026, 10, 1), 850), (ts(2026, 11, 1), 950), (fetched // 1000, 1000)]
-    assert gains.load_series(conn, pid)[20][0][1] == MAX_XP
-    assert db.import_runemetrics(conn, pid, tmp_path) == 3            # re-import replaces
-    assert conn.execute("SELECT COUNT(*) FROM snapshots").fetchone()[0] == 3
+    assert pts == [(ts(2026, 11, 5), 50_000_000)]
 
 
 # --- gains ----------------------------------------------------------------

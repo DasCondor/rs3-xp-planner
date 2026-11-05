@@ -1,7 +1,7 @@
 """RS3 skill list, XP curves and level targets."""
 import math
 
-# Index Lite skill ids (0 = Overall). RuneMetrics ids are these minus 1.
+# Index Lite skill ids (0 = Overall).
 SKILLS = [
     "Overall", "Attack", "Defence", "Strength", "Hitpoints", "Ranged", "Prayer", "Magic",
     "Cooking", "Woodcutting", "Fletching", "Fishing", "Firemaking", "Crafting", "Smithing",

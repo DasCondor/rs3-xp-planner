@@ -58,11 +58,12 @@ def summary(conn, pid: int, now: int, window: int = 30) -> dict:
             "targets": skill_targets(sid, xp, rate) if sid and has_xp else None,
         })
     first = min((pts[0][0] for pts in series.values() if pts), default=None)
-    monthly_until = conn.execute("SELECT MAX(taken_at) FROM snapshots WHERE player_id=? AND source='runemetrics'",
-                                 (pid,)).fetchone()[0]
+    tracked_from = conn.execute("SELECT MIN(taken_at) FROM snapshots WHERE player_id=? AND source='hiscores'",
+                                (pid,)).fetchone()[0]
     return {
-        # periods that start inside RuneMetrics' monthly-only data are interpolated estimates
-        "estimated": {p: bool(monthly_until) and s < monthly_until for p, s in starts.items()},
+        # periods that start before hourly tracking lean on Adventurer's Log points: approximate
+        "estimated": {p: tracked_from is None or s < tracked_from for p, s in starts.items()},
+        "tracked_from": tracked_from,
         "now": now,
         "window_days": window,
         "history_starts": first,

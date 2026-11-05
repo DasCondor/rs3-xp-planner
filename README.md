@@ -1,45 +1,110 @@
+<div align="center">
+
+<img src="docs/logo.svg" width="88" alt="">
+
 # rs3-xp-planner
 
-I wanted to know how long all 120s would actually take. RuneMetrics was about to shut down,
-and the new [Platform API](https://developer.runescape.com/platform/concepts.html) only
-gives you your stats *right now*. So this polls the Hiscores every hour and keeps the
-history in a SQLite file. Then it works out how far off you are.
+**Your RuneScape 3 XP history, and how far every skill is from 99, 120 and 200m.**
+<br>Self-hosted, and built only on Jagex's new RuneScape Platform API.
 
-There's a demo with my own stats (renamed) under **Website** in the About box on the right.
+[![tests](../../actions/workflows/tests.yml/badge.svg)](../../actions/workflows/tests.yml)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
+![Docker](https://img.shields.io/badge/docker-compose%20up-2496ED?logo=docker&logoColor=white)
+![RuneScape Platform API](https://img.shields.io/badge/RuneScape-Platform%20API-1f6b63)
+![No API key](https://img.shields.io/badge/API%20key-not%20needed-a8790f)
+![MIT](https://img.shields.io/badge/license-MIT-555)
 
-![dashboard](docs/screenshots/dashboard-light.png)
+[**Live demo**](../../deployments/github-pages) &nbsp;·&nbsp; [Quick start](#quick-start) &nbsp;·&nbsp; [Features](#features) &nbsp;·&nbsp; [How it works](#how-it-works) &nbsp;·&nbsp; [FAQ](#faq)
 
-## what it does
+<br>
 
-- XP gained today / this week / this month / this year, using the game's resets (00:00
-  UTC, Wednesday for weeks)
-- every skill with its virtual level, rank, how far it is to 99 / 120 / 200m, and an ETA
-- the ETA can come from your own pace over the last 7/30/90/365 days, from training
-  methods (fastest or most AFK), or from an xp/hr you type in
-- per-skill training routes, e.g. "Divination 113-120: Colossi, ~81 h"
-- boosts: clan avatar, dxp, and outfits / portables picked per skill (only skills that
-  actually have one, at their real bonus, e.g. Lumberjack 5%, portable range 21%)
-- activities (clues, RuneScore, minigames), quests and your Adventurer's Log, since the API
-  has them anyway
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark.png">
+  <img alt="The skill sheet: name, total level and XP, gains today/this week/this month/this year, then every skill with level, XP, rank, progress bar to 120, the method to train it with and an ETA" src="docs/screenshots/dashboard-light.png" width="100%">
+</picture>
 
-![training routes](docs/screenshots/training-light.png)
+</div>
 
-The training rates are in [`rsxp/methods.json`](rsxp/methods.json). Most come from the RS
-Wiki training guides as of Nov 2026. A few are from a third-party guide, and some low-level
-ones are my own rough guesses; they're marked as such. If your rates are different, just
-edit the file. Pricey Options (dragon darts, burial sets etc.) are left out unless you tick
-**Pricey Options**, otherwise they'd win every "fastest" route. Methods with no published
-xp/hr (like Fenmoor Totems for Woodcutting) are listed under each route but not counted in
-the hours.
+## Why
 
-## setup
+I wanted to know how long all 120s would actually take. In November 2026 Jagex opened
+the [RuneScape Platform API](https://developer.runescape.com/platform/concepts.html),
+which gives you your current stats, quests and Adventurer's Log, but no history. RuneMetrics
+used to have monthly XP, and it's discontinued on 10 November 2026.
 
-### docker (easiest)
+So this keeps the history itself. It checks the Hiscores every hour, saves every change to
+a SQLite file on your machine, and works out the rest from there.
 
-This is the way to go if you want it collecting 24/7 without thinking about it. You need
-[Docker](https://docs.docker.com/get-docker/) (Docker Desktop on Windows/mac).
+## Features
 
-Clone this repo (or download the zip from the green Code button), then in that folder:
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**XP history**<br>
+Gains for today, this week, this month and this year, using the game's own resets (00:00
+UTC, and Wednesdays for the week). There's a chart of XP by skill, and per-day or
+per-month bars for each skill.
+
+</td>
+<td width="50%" valign="top">
+
+**Goals for 99, 120 and 200m**<br>
+Every skill gets its virtual level past the cap, a progress bar, the XP left and an ETA.
+Invention uses its elite XP curve.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**Training routes**<br>
+Level by level, the fastest or the most AFK method and how many hours each stretch
+takes. Rates come from the RS Wiki training guides as of November 2026, including
+Colossi Divination and Fenmoor Totems.
+
+</td>
+<td valign="top">
+
+**Boosts per skill**<br>
+Tick the outfits and portables you actually own, at their real bonus: Lumberjack 5%,
+portable range 21% and so on. Clan avatar and DXP too. Pricey Options like dragon darts
+stay out unless you ask.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**Everything else the API has**<br>
+Ranks, Hiscores activities (RuneScore, clues by tier, minigames), quests (what you can
+start right now) and your Adventurer's Log.
+
+</td>
+<td valign="top">
+
+**Runs itself**<br>
+`docker compose up -d` and it collects 24/7, restarts after reboots and keeps your
+history in a volume. It has light and dark themes and works on a phone.
+
+</td>
+</tr>
+</table>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/charts-dark.png">
+  <img alt="XP gained this week by skill, coloured by skill group, next to per-day gains and a total XP line for Woodcutting" src="docs/screenshots/charts-light.png" width="100%">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/training-dark.png">
+  <img alt="Training to 120: hours per skill with the fastest and the easiest methods side by side, plus boost toggles" src="docs/screenshots/training-light.png" width="100%">
+</picture>
+
+## Quick start
+
+You need [Docker](https://docs.docker.com/get-docker/). Clone the repo (or download the
+zip), then in that folder:
 
 ```bash
 cp .env.example .env
@@ -56,73 +121,166 @@ RSXP_PLAYERS=Your Name, Alt Name
 docker compose up -d
 ```
 
-Open http://127.0.0.1:8765. Data lives in the `rsxp-data` volume, so rebuilding or updating
-the container keeps your history. It restarts on its own after a reboot.
+Then open **http://127.0.0.1:8765**. To update later, run
+`git pull && docker compose up -d --build`. Your history stays in the `rsxp-data` volume.
 
-A few handy ones:
+<details>
+<summary><b>Without Docker</b></summary>
 
-```bash
-docker compose logs -f
-git pull && docker compose up -d --build              # update to the latest version
-docker compose exec planner python -m rsxp plan "Your Name" --target 120
-```
+<br>
 
-The port is bound to `127.0.0.1` because the page has no login. If you want it on your
-LAN, change the port line in `docker-compose.yml` to `"8765:8765"` at your own risk.
-
-### without docker
-
-Python 3.10+.
+You need Python 3.10 or newer.
 
 ```bash
 pip install -r requirements.txt
 ```
 
 ```bash
-python -m rsxp serve
-```
-
-Go to http://127.0.0.1:8765 and add your RSN. On Windows you can just run
-`start_planner.bat`. It only collects while it's running, so either stick it in
-`shell:startup` or use Docker.
-
-Jagex asks that API clients identify themselves, so set a contact first:
-
-```bash
 set RSXP_CONTACT=your discord or github
 ```
 
-(Use `export` on Linux/mac.)
-
-There's a CLI too:
-
-```text
-python -m rsxp add "Name"
-python -m rsxp poll "Name"
-python -m rsxp plan "Name" --target 120
-python -m rsxp import-backfill "Name"   # old RuneMetrics data, see below
-python -m rsxp export-demo "Name"       # rebuilds docs/, swaps the name for "Demo Player"
+```bash
+python -m rsxp serve
 ```
 
-Tests: `python -m pytest tests`
+Use `export` instead of `set` on macOS and Linux. On Windows, `start_planner.bat` starts
+it and opens the browser. It only collects while it's running, so put it in
+`shell:startup` if you go this way.
 
-## notes
+</details>
 
-- **It's polite to the API.** One request at a time, 5 s+ apart, with a proper
-  User-Agent. It backs off on 429/5xx and stops for 30 min if things keep failing.
-  Hiscores only change when you log out or hop, so hourly is plenty.
-- **RuneMetrics history.** RuneMetrics went offline on 10 Nov 2026. If you grabbed your
-  monthly XP before that with `runemetrics_backfill.py`, `import-backfill` loads it. It's
-  monthly totals only, so gains inside those months are interpolated (they show with a `*`).
-- **Not affiliated with Jagex.** Rates are estimates, don't @ me if Colossi is slower for
-  you.
+## How it works
 
-## todo
+```mermaid
+flowchart LR
+  subgraph api["RuneScape Platform API"]
+    H["Hiscores<br/>index_lite.json"]
+    E["Adventurer's Log<br/>playerEvents"]
+    Q["Quests<br/>playerQuests"]
+  end
+  H -- every hour --> C["collector"]
+  E -- every 30 min --> C
+  Q -- every 6 h --> C
+  C --> DB[("SQLite")]
+  W["methods.json<br/>RS Wiki rates"] --> P
+  DB --> P["gains + planner"]
+  P --> UI["dashboard<br/>127.0.0.1:8765"]
+```
 
-- [ ] ironman hiscores (`hiscore_ironman` etc.), only the main hiscores are read right now
-- [ ] Invention virtual levels past 120 (elite curve isn't tabulated)
-- [ ] Fenmoor Totems woodcutting rate, once anyone publishes one
-- [ ] handle name changes properly; for now just add the new name
-- [ ] Slayer rates are guesses, the wiki has no per-hour figures
+**Where the history comes from:**
 
-MIT
+- **Hiscores snapshots.** One request an hour. A new row is only saved when your XP
+  actually changed. Hiscores update when you log out or hop worlds.
+- **Your Adventurer's Log.** Every 2M XP milestone ("70,000,000 XP in Construction")
+  and every level-up is an exact XP point with a timestamp. That gives each skill some
+  history from before you started tracking. These gains are marked `*`, because the log
+  only keeps your latest events and sometimes batches level-ups.
+
+**Where the ETAs come from:** your own recent pace, the training routes, or an XP/hr you
+type in. You pick which on the page.
+
+## Configuration
+
+| Setting | What it's for |
+|---|---|
+| `RSXP_CONTACT` | **Please set this.** It goes in the User-Agent, as Jagex [asks](https://developer.runescape.com/platform/best-practices.html), so they can reach you if something's wrong |
+| `RSXP_PLAYERS` | Comma-separated names to track on startup. You can also add them on the page |
+| `RSXP_DB` | Where the SQLite file lives. Docker uses `/data/rsxp.sqlite3` |
+| `RSXP_USER_AGENT` | Replaces the whole User-Agent if you'd rather write your own |
+
+Training rates, outfit and portable bonuses all live in
+[`rsxp/methods.json`](rsxp/methods.json). If your rates differ, edit that file and the
+planner picks up the change.
+
+<details>
+<summary><b>Command line</b></summary>
+
+<br>
+
+```text
+python -m rsxp serve [--port 8765]         dashboard + hourly collector
+python -m rsxp add "Name"                  track a player
+python -m rsxp poll ["Name"]               check Hiscores now
+python -m rsxp plan "Name" --target 120    print the plan in the terminal
+python -m rsxp export-demo "Name"          rebuild docs/ (shown as "Demo Player")
+```
+
+With Docker, put `docker compose exec planner` in front, for example
+`docker compose exec planner python -m rsxp plan "Name"`.
+
+</details>
+
+<details>
+<summary><b>Being nice to Jagex's API</b></summary>
+
+<br>
+
+Everything goes through one client ([`rsxp/client.py`](rsxp/client.py)):
+
+- One request at a time, at least 5 seconds apart, with jitter.
+- An identifying User-Agent with your contact on every request.
+- Only 429s, 5xx errors and timeouts are retried, with backoff and `Retry-After`. Redirects
+  are never followed.
+- After three failures in a row, it stops asking for 30 minutes.
+- Hiscores are checked hourly. The Adventurer's Log is fetched every 30 minutes, quests
+  every 6 hours, and names Hiscores can't find once a day.
+
+</details>
+
+<details>
+<summary><b>Project layout</b></summary>
+
+<br>
+
+| Path | What's in it |
+|---|---|
+| `rsxp/client.py` | Rate-limited Platform API client |
+| `rsxp/collector.py` | Polling schedule |
+| `rsxp/db.py` | SQLite storage |
+| `rsxp/gains.py` | History from snapshots and Adventurer's Log points |
+| `rsxp/planner.py` | Goals and ETAs |
+| `rsxp/training.py` | Training routes and boosts |
+| `rsxp/methods.json` | Methods, rates, outfits and portables |
+| `rsxp/server.py` | Local API |
+| `rsxp/static/index.html` | Dashboard, a single file |
+| `rsxp/demo.py` | Builds the static demo in `docs/` |
+
+</details>
+
+## FAQ
+
+**Why does my history only start today?**
+The API has no history endpoint, so the planner only knows what it has seen. Each skill
+does get some older points from your Adventurer's Log milestones. Leave it running and
+it fills in.
+
+**Why does a skill say "no recent XP"?**
+Recent-pace ETAs need at least a day of history with some XP in it. Switch the pace to
+**Fastest methods** to get a time from the training rates instead.
+
+**Can I open it on my phone or another PC?**
+The port is bound to `127.0.0.1` because there's no login. If you want it on your LAN,
+change the port line in `docker-compose.yml` to `"8765:8765"`, at your own risk.
+
+**Ironman?**
+Not yet. Only the main Hiscores are read for now (see the TODO list below).
+
+## TODO
+
+- [ ] Ironman Hiscores (`hiscore_ironman` and friends)
+- [ ] Invention virtual levels past 120 (the elite curve isn't tabulated)
+- [ ] A Fenmoor Totems Woodcutting rate, once someone publishes one
+- [ ] Proper name-change handling. For now, add the new name
+- [ ] Slayer rates: the wiki has no per-hour figures, so these are guesses
+
+## Credits
+
+The stats come from Jagex's [RuneScape Platform API](https://developer.runescape.com/platform/concepts.html).
+Training rates come from the [RuneScape Wiki](https://runescape.wiki/) training guides.
+Charts are drawn with [Chart.js](https://www.chartjs.org/), in the [Barlow](https://fonts.google.com/specimen/Barlow)
+typeface.
+
+This is a fan project and isn't affiliated with Jagex. RuneScape is a trademark of Jagex
+Ltd. Training rates are estimates.
+
+[MIT license](LICENSE)

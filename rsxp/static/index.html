@@ -279,7 +279,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
     <div class="panel">
       <h2 id="skill-title">Overall</h2>
       <div class="chart-block">
-        <h3>Per month <span class="key"><i id="key-sofar"></i>so far</span></h3>
+        <h3><span id="per-title">Per month</span> <span class="key"><i id="key-sofar"></i>so far</span></h3>
         <div class="canvas-box"><canvas id="c-monthly" aria-label="XP gained per month"></canvas></div>
       </div>
       <div class="chart-block">
@@ -369,7 +369,7 @@ const store = {
   set(k, v) { try { localStorage.setItem("rsxp." + k, JSON.stringify(v)); } catch {} },
 };
 const state = {
-  pid: store.get("pid", null), target: store.get("target", "120"), window: store.get("window", 30),
+  pid: store.get("pid", null), target: store.get("target", "120"), window: store.get("window", "fastest"),
   period: store.get("period", "week"), sort: { key: "id", dir: 1 }, skill: 0, data: null, charts: {},
   activities: [], quests: null, questTab: "ready", training: {}, events: [], openLists: { quests: false, events: false },
 };
@@ -387,6 +387,7 @@ function short(n) {
 function eta(days) {
   if (days === 0) return "done";
   if (days == null || !isFinite(days)) return "–";
+  if (days >= 365 * 50) return "50+ yr";   // means "barely trained lately", not a real plan
   if (days >= 365) return (days / 365).toFixed(1) + " yr";
   if (days >= 61) return (days / 30.44).toFixed(1) + " mo";
   if (days >= 14) return (days / 7).toFixed(1) + " wk";
@@ -512,12 +513,12 @@ function renderTable() {
   $("#th-pace").classList.toggle("r", !isMethods());
   $("#th-goal").textContent = "To " + state.target;
   $("#th-gain").textContent = periodLabel() + (d.estimated[state.period] ? "*" : "");
-  $("#th-gain").title = d.estimated[state.period] ? "Estimated from RuneMetrics monthly totals" : "";
+  $("#th-gain").title = d.estimated[state.period] ? "Partly from Adventurer's Log milestones, so approximate" : "";
   $("#table-note").innerHTML = '<span class="legend"><b class="c-combat">combat</b><b class="c-gathering">gathering</b>'
     + '<b class="c-artisan">artisan</b><b class="c-support">support</b><b class="c-elite">elite</b></span>'
     + ' &nbsp;·&nbsp; gold bar = there &nbsp;·&nbsp; (99) = real level, hiscores cap it'
     + (usesHours() ? ` &nbsp;·&nbsp; eta = all ${hours()} h/wk on that one skill` : "")
-    + (d.estimated[state.period] ? " &nbsp;·&nbsp; * from monthly totals, so a guess" : "");
+    + (d.estimated[state.period] ? " &nbsp;·&nbsp; * before tracking started, from Adventurer's Log milestones, so approximate" : "");
   $("#rows").innerHTML = rows.map(r => {
     const t = r.t, done = t && t.remaining === 0;
     const now = r.route && r.route.now;
@@ -545,15 +546,17 @@ function renderGoal(rows) {
   const remaining = open.reduce((a, r) => a + r.t.remaining, 0);
   const noRate = open.filter(r => r.eta == null);
   const slowest = open.filter(r => r.eta != null).sort((a, b) => b.eta - a.eta)[0];
-  if (!open.length) { $("#goal").innerHTML = `all ${state.target}s done, gz`; return; }
-  const bits = [`${state.target}s: <b>${29 - open.length}</b>/29`, `<b>${short(remaining)}</b> xp to go`];
+  if (!open.length) { $("#goal").innerHTML = `All 29 skills are at ${state.target}. Gz!`; return; }
+  const pace = state.window === "manual" ? "at your XP/hr"
+    : typeof state.window === "number" ? `at your ${state.window === 365 ? "last-year" : `last-${state.window}-days`} pace` : "";
+  const bits = [`At ${state.target}: <b>${29 - open.length}</b> of 29 skills`, `Still to go: <b>${short(remaining)}</b> XP`];
   const plan = isMethods() && state.training[state.window];
   if (plan && plan.total_hours != null)
-    bits.push(`~<b>${hrs(plan.total_hours)}</b> using ${state.window} methods${hours() > 0 ? ` (${eta(plan.total_hours / hours() * 7)} at ${hours()} h/wk)` : ""}`);
+    bits.push(`Training time: <b>~${hrs(plan.total_hours)}</b> with the ${state.window} methods${hours() > 0 ? ` (${eta(plan.total_hours / hours() * 7)} at ${hours()} h a week)` : ""}`);
   else if (!usesHours() && noRate.length)
-    bits.push(`no recent xp in ${noRate.map(r => r.name).slice(0, 3).join(", ")}${noRate.length > 3 ? "…" : ""}`);
+    bits.push(`No recent XP in ${noRate.map(r => r.name).slice(0, 3).join(", ")}${noRate.length > 3 ? " and more" : ""}, so no finish date`);
   else if (!usesHours() && slowest)
-    bits.push(`slowest: ${esc(slowest.name)}, ~${eta(slowest.eta)}`);
+    bits.push(`Longest wait: <span title="${nf.format(Math.round(slowest.eta))} days">${esc(slowest.name)}, ${eta(slowest.eta)}</span> ${pace}`);
   $("#goal").innerHTML = bits.join(" &nbsp;·&nbsp; ");
 }
 function renderKpis() {
@@ -568,7 +571,7 @@ function renderKpis() {
   ].filter(Boolean).map(x => `<span>${x}</span>`).join("");
   const since = d.history_starts ? new Date(d.history_starts * 1000).toLocaleDateString(undefined, { month: "short", year: "numeric" }) : null;
   const g = p => (o.gains[p] == null ? "–" : "+" + short(o.gains[p]));
-  const star = p => (d.partial[p] && since ? `<sup title="history starts ${since}">*</sup>` : d.estimated[p] ? '<sup title="from RuneMetrics monthly totals, so a guess">*</sup>' : "");
+  const star = p => (d.partial[p] && since ? `<sup title="history starts ${since}">*</sup>` : d.estimated[p] ? `<sup title="partly from Adventurer's Log milestones, so approximate">*</sup>` : "");
   const cell = (lbl, p, tip) => `<div title="${tip}"><dt>${lbl}</dt><dd>${g(p)}${star(p)}</dd></div>`;
   $("#kpis").innerHTML = cell("today", "day", "since 00:00 UTC") + cell("this week", "week", "since the Wednesday reset")
     + cell("this month", "month", "") + cell("this year", "year", "");
@@ -653,14 +656,23 @@ async function loadSkill(sid) {
   $("#key-sofar").style.background = info;
   $("#skill-title").style.color = sid ? accent : "";
 
+  // Short histories read better per day; switch to months once there are a few.
+  const byDay = (h.monthly || []).length < 3 && (h.daily || []).length > 0;
+  const bins = byDay ? h.daily : h.monthly;
+  $("#per-title").textContent = byDay ? "Per day" : "Per month";
+  const binLabel = (b, i) => byDay
+    ? (([y, m, d]) => (d === "01" || i === 0 ? `${Number(d)} ${MONTHS[m - 1]}` : String(Number(d))))(b.day.split("-"))
+    : monthLabel(b.month, i);
   replaceChart("monthly", $("#c-monthly"), {
     type: "bar",
-    data: { labels: h.monthly.map((m, i) => monthLabel(m.month, i)), datasets: [{
-      data: h.monthly.map(m => m.gain), backgroundColor: h.monthly.map(m => (m.partial ? info : accent)),
+    data: { labels: bins.map(binLabel), datasets: [{
+      data: bins.map(m => m.gain), backgroundColor: bins.map(m => (m.partial ? info : accent)),
       borderRadius: 0, minBarLength: 2, barPercentage: 0.7 }] },
     options: { maintainAspectRatio: false, layout: { padding: { top: 22 } },
       plugins: { legend: { display: false }, tooltip: { callbacks: {
-        title: i => { const m = h.monthly[i[0].dataIndex]; const [y, mo] = m.month.split("-"); return `${MONTHS[mo - 1]} ${y}${m.partial ? " (so far)" : ""}`; },
+        title: i => { const b = bins[i[0].dataIndex];
+          if (byDay) { const [y, mo, d] = b.day.split("-"); return `${Number(d)} ${MONTHS[mo - 1]} ${y}${b.partial ? " (so far)" : ""}`; }
+          const [y, mo] = b.month.split("-"); return `${MONTHS[mo - 1]} ${y}${b.partial ? " (so far)" : ""}`; },
         label: c => "+" + nf.format(c.raw) + " XP" } } },
       scales: { y: { beginAtZero: true, ticks: { callback: v => short(v), maxTicksLimit: 6 } },
         x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, color: css("--ink") } } } },
@@ -678,10 +690,17 @@ async function loadSkill(sid) {
     sets.push({ label: `${state.target}`, data: [{ x: pts[0].x, y: goal }, { x: pts[pts.length - 1].x, y: goal }],
       borderColor: good, borderDash: [3, 3], pointRadius: 0, borderWidth: 1.5 });
   const minX = pts.length ? pts[0].x : 0, maxX = pts.length ? pts[pts.length - 1].x : 0;
+  // month ticks for long histories, day ticks (every 1-7 days) for short ones
+  const DAYMS = 864e5, shortSpan = maxX - minX < 60 * DAYMS;
   const monthTicks = [];
-  for (let d = new Date(minX); d.getTime() <= maxX; d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))) {
-    const start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
-    if (start >= minX) monthTicks.push(start);
+  if (shortSpan) {
+    const step = Math.max(1, Math.ceil((maxX - minX) / DAYMS / 8));
+    for (let t = Math.ceil(minX / DAYMS) * DAYMS; t <= maxX; t += step * DAYMS) monthTicks.push(t);
+  } else {
+    for (let d = new Date(minX); d.getTime() <= maxX; d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))) {
+      const start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+      if (start >= minX) monthTicks.push(start);
+    }
   }
   replaceChart("history", $("#c-history"), {
     type: "line", data: { datasets: sets },
@@ -694,7 +713,9 @@ async function loadSkill(sid) {
         x: { type: "linear", min: minX, max: maxX, grid: { display: false },
           afterBuildTicks: axis => { axis.ticks = monthTicks.map(v => ({ value: v })); },
           ticks: { maxRotation: 0, autoSkip: true, color: css("--ink"), callback: v => {
-            const d = new Date(v); return d.getUTCMonth() === 0 ? `Jan '${String(d.getUTCFullYear()).slice(2)}` : MONTHS[d.getUTCMonth()]; } } },
+            const d = new Date(v);
+            if (shortSpan) return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+            return d.getUTCMonth() === 0 ? `Jan '${String(d.getUTCFullYear()).slice(2)}` : MONTHS[d.getUTCMonth()]; } } },
         y: { ticks: { callback: v => short(v), maxTicksLimit: 6 } } } },
   });
 }
@@ -1017,6 +1038,11 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
   renderBoostControls();
   renderKit().catch(e => notice(e.message, true));
   try {
+    const want = decodeURIComponent(location.hash.slice(1)).toLowerCase();
+    if (want) state.skill = Math.max(0, ["overall","attack","defence","strength","hitpoints","ranged","prayer","magic",
+      "cooking","woodcutting","fletching","fishing","firemaking","crafting","smithing","mining","herblore","agility",
+      "thieving","slayer","farming","runecraft","hunter","construction","summoning","dungeoneering","divination",
+      "invention","archaeology","necromancy"].indexOf(want));
     if (await loadPlayers()) await loadAll();
   } catch (e) { notice(e.message, true); }
   if (!STATIC) setInterval(() => state.pid && loadSummary().then(loadExtras).catch(() => {}), 5 * 60 * 1000);

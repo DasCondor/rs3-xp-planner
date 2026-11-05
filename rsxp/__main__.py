@@ -38,9 +38,6 @@ def main(argv=None):
     sub.add_parser("add", help="track a player").add_argument("name")
     p = sub.add_parser("poll", help="fetch Hiscores now (one player, or all that are due)")
     p.add_argument("name", nargs="?")
-    p = sub.add_parser("import-backfill", help="load runemetrics_backfill.py output")
-    p.add_argument("name")
-    p.add_argument("--dir", help="default: rm_backfill/<name>")
     p = sub.add_parser("plan", help="print the plan for one target")
     p.add_argument("name")
     p.add_argument("--target", choices=["99", "120", "200m"], default="120")
@@ -78,10 +75,6 @@ def main(argv=None):
             from .demo import export
             n = export(conn, args.name, Path(args.out), args.display_as, args.repo)
             print(f"wrote {Path(args.out) / 'index.html'} and {n} data files")
-        elif args.cmd == "import-backfill":
-            player = need_player(conn, args.name)
-            folder = Path(args.dir) if args.dir else ROOT / "rm_backfill" / db.name_key(args.name).replace(" ", "_")
-            print(f"wrote {db.import_runemetrics(conn, player['id'], folder)} snapshots from {folder}")
         elif args.cmd == "plan":
             player = need_player(conn, args.name)
             s = planner.summary(conn, player["id"], int(time.time()), args.window)

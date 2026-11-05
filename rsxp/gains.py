@@ -1,13 +1,48 @@
-"""XP-over-time queries built on snapshots.
+"""XP-over-time queries, using only data from the RuneScape Platform API.
 
-Each skill's history is a list of (time, xp) points. XP between points is linearly
-interpolated: exact for hourly snapshots, an estimate inside RuneMetrics months.
+Each skill's history is a list of (time, xp) points from two sources:
+  * Hiscores snapshots (hourly while the planner runs): exact.
+  * Adventurer's Log events: every 2M XP milestone ("70000000XP in Construction") and
+    level-up ("I am now level 116") is an XP point at that moment. These reach back
+    before you started tracking, but only as far as the log does, and level-ups can be
+    batched, so they're treated as approximate.
+XP between points is linearly interpolated.
 """
 import bisect
+import re
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
+from .xp import INVENTION, SKILLS, XP_TABLE
+
 DAY = 86400
+# Adventurer's Log uses the in-game names for these two
+EVENT_ALIASES = {"Constitution": "Hitpoints", "Runecrafting": "Runecraft"}
+_MILESTONE = re.compile(r"^\s*(\d+)\s*XP in (.+?)\.?\s*$", re.I)
+_LEVELUP = re.compile(r"levelled my (.+?) skill, I am now level (\d+)", re.I)
+
+
+def event_points(conn, pid: int) -> dict[int, list[tuple[int, int]]]:
+    """XP points read from stored Adventurer's Log events."""
+    index = {n: i for i, n in enumerate(SKILLS)}
+    out = defaultdict(list)
+    for date, text, details in conn.execute(
+            "SELECT date, text, details FROM events WHERE player_id=?", (pid,)):
+        m = _MILESTONE.match(text or "")
+        if m:
+            name, xp = m.group(2).strip(), int(m.group(1))
+        else:
+            m = _LEVELUP.search(details or "")
+            if not m:
+                continue
+            name, level = m.group(1).strip(), int(m.group(2))
+            if index.get(EVENT_ALIASES.get(name, name)) == INVENTION or not 1 < level < len(XP_TABLE):
+                continue   # Invention uses the elite curve, which isn't tabulated
+            xp = XP_TABLE[level]
+        sid = index.get(EVENT_ALIASES.get(name, name))
+        if sid:
+            out[sid].append((date, xp))
+    return out
 
 
 def load_series(conn, pid: int) -> dict[int, list[tuple[int, int]]]:
@@ -15,12 +50,22 @@ def load_series(conn, pid: int) -> dict[int, list[tuple[int, int]]]:
     for taken, seen, sid, xp in conn.execute(
             "SELECT s.taken_at, s.seen_until, k.skill_id, k.xp FROM snapshots s "
             "JOIN snapshot_skills k ON k.snapshot_id = s.id "
-            "WHERE s.player_id=? AND k.xp >= 0 ORDER BY s.taken_at, s.id", (pid,)):
+            "WHERE s.player_id=? AND s.source='hiscores' AND k.xp >= 0 ORDER BY s.taken_at, s.id", (pid,)):
         series[sid].append((taken, xp))
         if seen > taken:
             series[sid].append((seen, xp))
-    for pts in series.values():
+    for sid, pts in event_points(conn, pid).items():
+        series[sid].extend(pts)
+    for sid, pts in series.items():
         pts.sort()
+        # XP never goes down. A batched level-up can be dated after a snapshot that
+        # already shows more XP; drop points like that instead of drawing a dip.
+        kept, top = [], -1
+        for t, xp in pts:
+            if xp >= top:
+                kept.append((t, xp))
+                top = xp
+        series[sid] = kept
     return series
 
 
@@ -86,6 +131,21 @@ def monthly(pts, now: int) -> list[dict]:
         out.append({"month": f"{y:04d}-{m:02d}", "gain": g,
                     "partial": partial or end == now})
         y, m = y2, m2
+    return out
+
+
+def daily(pts, now: int, days: int = 30) -> list[dict]:
+    """UTC-day gains for the last `days` days that have history."""
+    if not pts:
+        return []
+    today = int(datetime.fromtimestamp(now, tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+    first_day = int(datetime.fromtimestamp(pts[0][0], tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+    out = []
+    for start in range(max(first_day, today - (days - 1) * DAY), today + 1, DAY):
+        end = min(start + DAY, now)
+        g, partial = gain(pts, start, end)
+        out.append({"day": datetime.fromtimestamp(start, tz=timezone.utc).strftime("%Y-%m-%d"),
+                    "gain": g, "partial": partial or end == now})
     return out
 
 

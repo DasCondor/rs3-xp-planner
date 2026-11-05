@@ -48,7 +48,7 @@ def export(conn, player_name: str, out: Path, display_as: str | None = "Demo Pla
     for sid in range(len(SKILLS)):
         pts = series.get(sid, [])
         write(f"skill-{sid}", {"skill": SKILLS[sid], "history": gains.downsample(pts),
-                               "monthly": gains.monthly(pts, now)})
+                               "monthly": gains.monthly(pts, now), "daily": gains.daily(pts, now)})
     write("events", [dict(r) for r in conn.execute(
         "SELECT date, type, text, details FROM events WHERE player_id=? ORDER BY date DESC LIMIT 30", (pid,))])
     write("activities", db.activities(conn, pid, gains.period_starts(now)))

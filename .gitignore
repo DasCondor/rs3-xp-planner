@@ -1,4 +1,4 @@
-# Personal data: your tracked players, snapshots and RuneMetrics backfill
+# Personal data: your tracked players and snapshots (rm_backfill = old local files)
 /data/
 /rm_backfill/
 
@@ -16,3 +16,8 @@ marks.ini
 
 # Docker settings (has your contact)
 .env
+
+# Local planning notes
+/design/
+
+page.js

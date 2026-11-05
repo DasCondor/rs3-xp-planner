@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <rect width="96" height="96" rx="14" fill="#1f6b63"/>
+  <rect x="7" y="7" width="82" height="82" rx="9" fill="none" stroke="#e4b84f" stroke-width="3"/>
+  <text x="48" y="61" font-family="Bahnschrift, 'Arial Narrow', Arial, sans-serif" font-weight="700"
+        font-size="40" fill="#e4b84f" text-anchor="middle">99</text>
+  <rect x="22" y="70" width="52" height="5" fill="#0f3d38"/>
+  <rect x="22" y="70" width="38" height="5" fill="#e4b84f"/>
+</svg>

@@ -15,6 +15,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install -r requirements.txt pytest
       - run: python -m pytest -q tests
+      - name: Syntax-check the dashboard script
+        run: |
+          python tests/extract_page_js.py
+          node --check page.js
 
   docker:
     runs-on: ubuntu-latest
