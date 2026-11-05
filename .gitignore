@@ -1,0 +1,15 @@
+# Personal data: your tracked players, snapshots and RuneMetrics backfill
+/data/
+/rm_backfill/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Local tooling and unrelated files in this folder
+.claude/
+*.ahk
+marks.ini

@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RS3 XP Planner</title>
+<style>
+:root{
+  --bg:#f2f4f7; --surface:#ffffff; --surface-2:#f7f8fa; --ink:#18212e; --muted:#5d6878; --line:#dce1e8; --grid:#e9ecf1;
+  --accent:#a87a12; --accent-ink:#ffffff; --accent-soft:#f5ead0; --track:#e6e9ee;
+  --good:#2e7a4f; --good-soft:#dcf0e3; --warn:#a2461f; --warn-soft:#f7e3d9; --info:#3f6aa3; --info-soft:#e2eaf6;
+  --f-ui:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0f141b; --surface:#171e28; --surface-2:#1c2430; --ink:#e8edf4; --muted:#a3aebd; --line:#2a3443; --grid:#232c39;
+  --accent:#e2b34c; --accent-ink:#1a1408; --accent-soft:#3a301c; --track:#263040;
+  --good:#6fcf98; --good-soft:#173326; --warn:#ee9166; --warn-soft:#3b2419; --info:#8db0e3; --info-soft:#1d2a3d;
+  color-scheme:dark}}
+*{box-sizing:border-box}
+[hidden],.demo-off{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--f-ui)}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:1320px;margin:0 auto;padding:20px 16px 48px;display:grid;gap:18px}
+header{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center}
+.brand{font-weight:700;font-size:18px;letter-spacing:-.01em;margin-right:auto}
+.brand small{display:block;font-weight:400;font-size:12px;color:var(--muted)}
+.brand a{color:var(--accent)}
+select,input,button{font:inherit;color:inherit}
+select,input{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 10px}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button{cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--surface);padding:7px 12px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button:disabled{opacity:.55;cursor:default}
+.status{font-size:12.5px;color:var(--muted)}
+.notice{padding:10px 14px;border-radius:6px;background:var(--accent-soft);font-size:13.5px}
+.notice.err{background:var(--warn-soft);color:var(--warn)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:grid;gap:2px}
+.kpi .lbl{font-size:12px;color:var(--muted)}
+.kpi .val{font-size:22px;font-weight:650}
+.kpi .sub{font-size:12px;color:var(--muted)}
+.controls{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;border-radius:0;padding:6px 12px;background:transparent}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.ctl{display:flex;gap:8px;align-items:center}
+.ctl > span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.goal{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:12px 16px;display:flex;flex-wrap:wrap;gap:6px 26px;align-items:baseline}
+.goal b{font-size:16px}
+.goal span{color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;min-width:0;display:flex;flex-direction:column}
+.panel > h2{font-size:15px;margin:0;padding:12px 16px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 12px}
+.panel > h2 small{font-weight:400;color:var(--muted);font-size:12.5px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+.skills table{min-width:900px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{font-size:11.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;background:var(--surface-2)}
+th[data-sort]{cursor:pointer}
+th[data-sort]:hover{color:var(--ink)}
+th.r,td.r{text-align:right}
+.skills tbody tr{cursor:pointer}
+.skills tbody tr:hover{background:var(--surface-2)}
+.skills tbody tr.sel{background:var(--accent-soft)}
+tr.overall td{font-weight:600}
+.bar{width:140px;height:8px;background:var(--track);border-radius:4px;overflow:hidden;display:inline-block;vertical-align:middle}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.bar.done i{background:var(--good)}
+.pct{display:inline-block;width:52px;text-align:right;color:var(--muted);font-size:12.5px}
+.pill{font-size:11.5px;padding:2px 7px;border-radius:999px;background:var(--good-soft);color:var(--good);font-weight:600;white-space:nowrap}
+.pill.info{background:var(--info-soft);color:var(--info)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.gold{background:var(--accent-soft);color:var(--accent)}
+.dim{color:var(--muted)}
+td input{width:90px;padding:3px 6px;text-align:right}
+.charts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:18px;align-items:start}
+.lower{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
+@media (max-width:1100px){.charts,.lower{grid-template-columns:minmax(0,1fr)}}
+.chart-block{padding:14px 16px 16px;display:grid;gap:8px}
+.chart-block + .chart-block{border-top:1px solid var(--line)}
+.chart-block h3{margin:0;font-size:13.5px;font-weight:600;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.chart-block h3 small{font-weight:400;color:var(--muted)}
+.key{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);font-weight:400}
+.key i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.canvas-box{position:relative;height:280px}
+.canvas-box.tall{height:auto}
+.list{list-style:none;margin:0;padding:0;max-height:420px;overflow:auto}
+.list li{padding:9px 16px;border-bottom:1px solid var(--line);display:grid;gap:3px}
+.list li:last-child{border-bottom:0}
+.list .row{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.list time,.list .meta{font-size:12px;color:var(--muted)}
+.empty{padding:22px 16px;text-align:center;color:var(--muted)}
+.qp{padding:14px 16px;display:grid;gap:10px;border-bottom:1px solid var(--line)}
+.qp .big{font-size:22px;font-weight:650}
+.qp .bar{width:100%;height:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.tabs{display:flex;gap:4px;padding:10px 16px 0;flex-wrap:wrap}
+.tabs button{padding:4px 10px;font-size:12.5px;border-radius:999px}
+.tabs button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.panel table td,.panel table th{padding:7px 16px}
+.method{display:inline-block;max-width:230px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+.routes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:800px){.routes{grid-template-columns:minmax(0,1fr)}}
+.route{padding:14px 16px;display:grid;gap:10px;align-content:start;min-width:0}
+.route + .route{border-left:1px solid var(--line)}
+@media (max-width:800px){.route + .route{border-left:0;border-top:1px solid var(--line)}}
+.route h3{margin:0;font-size:14px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline}
+.route h3 small{font-weight:400;color:var(--muted)}
+.step{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:4px 12px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line)}
+.step .lv{font-weight:600;font-variant-numeric:tabular-nums}
+.step .what{display:grid;gap:3px;min-width:0}
+.step .what span:first-child{overflow-wrap:anywhere}
+.step .meta{font-size:12px;color:var(--muted)}
+.step .h{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.route-sum td,.route-sum th{padding:6px 0}
+.route-sum td.r,.route-sum th.r{padding-left:12px}
+.boosts{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--surface-2);font-size:13px}
+.boosts .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.boosts label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.boosts select{padding:3px 6px}
+.tag{font-size:11px;padding:1px 6px;border-radius:4px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.tag.warn{border-color:var(--warn);color:var(--warn)}
+.others{margin:0;padding:8px 0 0;list-style:none;display:grid;gap:4px;font-size:12.5px;color:var(--muted);border-top:1px dashed var(--line)}
+.others b{color:var(--ink);font-weight:600}
+form.add{display:flex;gap:6px}
+form.add input{width:150px}
+@media (prefers-reduced-motion:no-preference){.bar i{transition:width .3s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">RS3 XP Planner<small>Gains history and goals for 99, 120 and 200m</small></div>
+    <select id="player" aria-label="Player"></select>
+    <button id="refresh" class="primary">Update now</button>
+    <form class="add" id="add-form">
+      <input id="add-name" placeholder="Add a player" maxlength="12" aria-label="Display name to track">
+      <button type="submit">Track</button>
+    </form>
+  </header>
+  <div class="status" id="status"></div>
+  <div id="notice" hidden></div>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="controls">
+    <div class="ctl"><span>Goal</span><div class="seg" id="seg-target"></div></div>
+    <div class="ctl"><span>Pace</span><div class="seg" id="seg-window"></div></div>
+    <div class="ctl" id="hours-ctl" hidden><span>Hours / week</span><input id="hours" type="number" min="0" step="1" style="width:80px"></div>
+    <div class="ctl"><span>Gained</span><div class="seg" id="seg-period"></div></div>
+  </section>
+
+  <section class="goal" id="goal"></section>
+
+  <section class="panel skills">
+    <h2>Skills <small id="table-note"></small></h2>
+    <div class="scroll"><table>
+      <thead><tr>
+        <th data-sort="id">Skill</th>
+        <th class="r" data-sort="virtual_level">Level</th>
+        <th class="r" data-sort="xp">XP</th>
+        <th class="r" data-sort="rankSort">Rank</th>
+        <th class="r" data-sort="gain" id="th-gain">Gained</th>
+        <th data-sort="pct" id="th-goal">Progress</th>
+        <th class="r" data-sort="remaining">XP left</th>
+        <th class="r" id="th-pace">XP / day</th>
+        <th class="r" data-sort="eta">ETA</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+  </section>
+
+  <section class="charts">
+    <div class="panel">
+      <h2><span id="by-skill-title">XP gained by skill</span><small>click a bar to open that skill</small></h2>
+      <div class="chart-block">
+        <div class="canvas-box tall" id="by-skill-box"><canvas id="c-by-skill" aria-label="XP gained per skill"></canvas></div>
+        <p class="empty" id="by-skill-empty" hidden>No XP gained in this period yet.</p>
+      </div>
+    </div>
+    <div class="panel">
+      <h2><span id="skill-title">Overall</span><small>click a skill in the table or chart to switch</small></h2>
+      <div class="chart-block">
+        <h3>XP gained per month
+          <span class="key"><i style="background:var(--accent)"></i>full month <i style="background:var(--info)"></i>month so far</span></h3>
+        <div class="canvas-box"><canvas id="c-monthly" aria-label="XP gained per month"></canvas></div>
+      </div>
+      <div class="chart-block">
+        <h3>Total XP <small id="history-note"></small></h3>
+        <div class="canvas-box"><canvas id="c-history" aria-label="Total XP over time"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2><span id="route-title">Training route</span><small>base rates from the RuneScape Wiki (Nov 2026), editable in rsxp/methods.json</small></h2>
+    <div class="boosts" id="boosts">
+      <span class="lbl">XP boosts</span>
+      <label>Clan avatar <select id="b-avatar"><option value="0">none</option><option value="3">3%</option><option value="6">6%</option></select></label>
+      <label><input type="checkbox" id="b-outfit"> Skilling outfit (+6%, non-combat)</label>
+      <label><input type="checkbox" id="b-portable"> Portable stations (+10%)</label>
+      <label><input type="checkbox" id="b-double"> Double XP event</label>
+      <label><input type="checkbox" id="b-expensive"> Allow expensive methods</label>
+    </div>
+    <div class="routes" id="routes"></div>
+  </section>
+
+  <section class="lower">
+    <div class="panel">
+      <h2>Activities <small>Hiscores minigames, clues and RuneScore</small></h2>
+      <div class="scroll"><table>
+        <thead><tr><th>Activity</th><th class="r">Score</th><th class="r">Rank</th><th class="r" id="act-gain">Gained</th></tr></thead>
+        <tbody id="activities"></tbody>
+      </table></div>
+    </div>
+    <div class="panel">
+      <h2>Quests <small id="quests-checked"></small></h2>
+      <div class="qp" id="qp"></div>
+      <div class="tabs" id="quest-tabs"></div>
+      <ul class="list" id="quests"></ul>
+    </div>
+    <div class="panel">
+      <h2>Adventurer's Log <small>latest events</small></h2>
+      <ul class="list" id="events"></ul>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const TARGETS = ["99", "120", "200m"];
+const WINDOWS = [[7, "7 days"], [30, "30 days"], [90, "90 days"], [365, "1 year"],
+  ["fastest", "Fastest methods"], ["easiest", "Easiest methods"], ["manual", "Manual"]];
+const MODES = ["fastest", "easiest"];
+const EFFORT = { afk: ["AFK", ""], low: ["Low effort", "info"], high: ["High effort", "warn"] };
+const isMethods = () => MODES.includes(state.window);
+const usesHours = () => state.window === "manual" || isMethods();
+function hrs(h) {
+  if (h == null) return "–";
+  if (h < 1) return Math.max(1, Math.round(h * 60)) + " min";
+  return nf.format(h < 10 ? Math.round(h * 10) / 10 : Math.round(h)) + " h";
+}
+const PERIODS = [["day", "Today"], ["week", "This week"], ["month", "This month"], ["year", "This year"]];
+const DIFFICULTY = { 0: "Novice", 1: "Intermediate", 2: "Experienced", 3: "Master", 4: "Grandmaster", 250: "Special" };
+const EVENT_TAGS = [
+  [/levelup|xp_milestone/, "Skill", "gold"], [/quest|qp_milestone/, "Quest", "info"],
+  [/npc_defeat|npc_kill|pvp_kill/, "Kills", "warn"], [/item_drop|item_found|wof_drop/, "Loot", ""],
+  [/finished_trail/, "Clue", "info"], [/dungeons/, "Dungeoneering", "gold"], [/music/, "Music", "info"],
+];
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("rsxp." + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("rsxp." + k, JSON.stringify(v)); } catch {} },
+};
+const state = {
+  pid: store.get("pid", null), target: store.get("target", "120"), window: store.get("window", 30),
+  period: store.get("period", "week"), sort: { key: "id", dir: 1 }, skill: 0, data: null, charts: {},
+  activities: [], quests: null, questTab: "ready", training: {},
+};
+
+// ---------- formatting ----------
+const nf = new Intl.NumberFormat("en-GB");
+function short(n) {
+  if (n == null) return "–";
+  const a = Math.abs(n);
+  if (a >= 1e9) return (n / 1e9).toFixed(2) + "b";
+  if (a >= 1e6) return (n / 1e6).toFixed(a >= 1e8 ? 0 : 1) + "m";
+  if (a >= 1e4) return (n / 1e3).toFixed(0) + "k";
+  return nf.format(Math.round(n));
+}
+function eta(days) {
+  if (days === 0) return "done";
+  if (days == null || !isFinite(days)) return "–";
+  if (days >= 365) return (days / 365).toFixed(1) + " yr";
+  if (days >= 61) return (days / 30.44).toFixed(1) + " mo";
+  if (days >= 14) return (days / 7).toFixed(1) + " wk";
+  if (days >= 1) return Math.round(days) + " d";
+  return Math.max(1, Math.round(days * 24)) + " h";
+}
+function etaDate(days) {
+  if (!days || !isFinite(days) || days > 365 * 200) return "";
+  return new Date(Date.now() + days * 864e5).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+function ago(ts) {
+  if (!ts) return "never";
+  const s = Date.now() / 1000 - ts;
+  if (s < 90) return "just now";
+  if (s < 5400) return Math.round(s / 60) + " min ago";
+  if (s < 172800) return Math.round(s / 3600) + " h ago";
+  return Math.round(s / 86400) + " days ago";
+}
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function monthLabel(ym, i) { // "2026-01" -> "Jan '26" on January and the first bar, else "Feb"
+  const [y, m] = ym.split("-").map(Number);
+  return m === 1 || i === 0 ? `${MONTHS[m - 1]} '${String(y).slice(2)}` : MONTHS[m - 1];
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const periodLabel = () => PERIODS.find(p => p[0] === state.period)[1];
+
+// ---------- api ----------
+const SERVER = "http://127.0.0.1:8765/";
+// Demo mode: `python -m rsxp export-demo` sets window.RSXP_STATIC and writes the API's
+// answers as JSON files, so the page runs on GitHub Pages with no server.
+const STATIC = window.RSXP_STATIC || null;
+const staticCache = {};
+async function staticJson(name) {
+  if (!staticCache[name]) staticCache[name] = fetch(`${STATIC.base}${name}.json`).then(r => {
+    if (!r.ok) throw new Error(`Demo data file ${name}.json is missing.`);
+    return r.json();
+  });
+  return structuredClone(await staticCache[name]);
+}
+// Mirrors training.multiplier() in Python: boosts scale every rate for a skill.
+function applyBoosts(plan, q, cfg) {
+  const b = { avatar: Number(q.get("avatar")) || 0, outfit: q.get("outfit") === "true",
+              portable: q.get("portable") === "true", double: q.get("double") === "true" };
+  for (const s of plan.skills) {
+    let mult = 1 + b.avatar / 100;
+    if (b.outfit && !cfg.combat_skills.includes(s.name)) mult *= 1 + cfg.boosts.outfit.percent / 100;
+    if (b.portable && cfg.boosts.portable.applies.includes(s.name)) mult *= 1 + cfg.boosts.portable.percent / 100;
+    if (b.double) mult *= 1 + cfg.boosts.double.percent / 100;
+    s.multiplier = mult;
+    for (const g of s.segments) { g.xp_hr = Math.round(g.base_xp_hr * mult); g.hours = g.xp / (g.base_xp_hr * mult); }
+    if (s.hours != null) s.hours = s.segments.reduce((a, g) => a + g.hours, 0);
+    if (s.now) s.now.boosted_xp_hr = Math.round(s.now.xp_hr * mult);
+  }
+  const open = plan.skills.filter(s => s.remaining > 0);
+  plan.total_hours = open.some(s => s.hours == null) ? null : open.reduce((a, s) => a + s.hours, 0);
+  plan.boosts = b;
+  return plan;
+}
+async function staticApi(path, opts) {
+  if (opts.method && opts.method !== "GET")
+    throw new Error("This is a read-only demo. Run the planner on your own PC to track players and update stats.");
+  const u = new URL(path, "http://demo"), p = u.pathname, q = u.searchParams;
+  if (p === "/api/players") return staticJson("players");
+  if (p.endsWith("/summary")) return staticJson(`summary-${q.get("window")}`);
+  if (/\/skills\/\d+$/.test(p)) return staticJson(`skill-${p.split("/").pop()}`);
+  if (p.endsWith("/training")) {
+    const plan = await staticJson(`training-${q.get("target")}-${q.get("mode")}-${q.get("expensive") === "true" ? "all" : "std"}`);
+    return applyBoosts(plan, q, await staticJson("boosts"));
+  }
+  for (const name of ["events", "activities", "quests"]) if (p.endsWith("/" + name)) return staticJson(name);
+  throw new Error("Not available in the demo: " + p);
+}
+async function api(path, opts = {}) {
+  if (STATIC) return staticApi(path, opts);
+  let r;
+  try {
+    r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  } catch {
+    throw new Error("Can't reach the planner server. Start it by double-clicking start_planner.bat " +
+      "(or run: python -m rsxp serve), then reload this page.");
+  }
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof body.detail === "string" ? body.detail : r.statusText);
+  return body;
+}
+function notice(msg, err = false) {
+  const n = $("#notice");
+  n.hidden = !msg; n.className = "notice" + (err ? " err" : ""); n.textContent = msg || "";
+}
+
+// ---------- manual pace ----------
+const manualKey = () => "manual." + state.pid;
+const manual = () => store.get(manualKey(), {});
+const hours = () => Number(store.get("hours", 10)) || 0;
+const manualRate = sid => (Number(manual()[sid]) || 0) * hours() / 7; // XP per day
+
+// ---------- skills table ----------
+function rowModel(s) {
+  const t = s.targets && s.targets[state.target];
+  let etaDays = t ? t.eta_days : null, route = null;
+  if (t && state.window === "manual") etaDays = t.remaining === 0 ? 0 : (manualRate(s.id) > 0 ? t.remaining / manualRate(s.id) : null);
+  if (t && isMethods()) {
+    route = state.training[state.window]?.skills.find(x => x.id === s.id) || null;
+    etaDays = t.remaining === 0 ? 0 : (route && route.hours != null && hours() > 0 ? route.hours / hours() * 7 : null);
+  }
+  return { ...s, t, route, gain: s.gains[state.period], pct: t ? t.pct : -1, remaining: t ? t.remaining : -1, eta: etaDays,
+           rankSort: s.rank > 0 ? -s.rank : -Infinity };
+}
+function sorted(rows) {
+  const { key, dir } = state.sort;
+  const v = r => (r[key] == null ? (key === "eta" ? Infinity : -Infinity) : r[key]);
+  const overall = rows.filter(r => r.id === 0), rest = rows.filter(r => r.id !== 0);
+  return overall.concat(rest.sort((a, b) => (v(a) > v(b) ? 1 : v(a) < v(b) ? -1 : a.id - b.id) * dir));
+}
+function renderTable() {
+  const d = state.data, isManual = state.window === "manual";
+  const rows = sorted(d.skills.map(rowModel));
+  $("#th-pace").textContent = isManual ? "XP / hr" : isMethods() ? "Train with now" : "XP / day";
+  $("#th-pace").classList.toggle("r", !isMethods());
+  $("#th-goal").textContent = "Progress to " + state.target;
+  $("#th-gain").textContent = periodLabel() + (d.estimated[state.period] ? " ≈" : "");
+  $("#th-gain").title = d.estimated[state.period] ? "Estimated: this period starts inside RuneMetrics monthly data" : "";
+  $("#table-note").textContent = isManual
+    ? `ETA if you put all ${hours()} h a week into that skill at your XP/hr`
+    : isMethods() ? `ETA if you put all ${hours()} h a week into that skill, using the ${state.window} methods`
+    : `ETA at your pace over the last ${WINDOWS.find(w => w[0] === state.window)[1]}`;
+  $("#rows").innerHTML = rows.map(r => {
+    const t = r.t, done = t && t.remaining === 0;
+    const now = r.route && r.route.now;
+    const pace = r.id === 0 ? "" : isManual
+      ? (done ? "" : `<input type="number" min="0" step="1000" data-xphr="${r.id}" value="${manual()[r.id] || ""}" placeholder="XP/hr" aria-label="${esc(r.name)} XP per hour">`)
+      : isMethods()
+      ? (done || !now ? "" : `<span class="method" title="${esc(now.name)} · ${short(now.boosted_xp_hr)} XP/hr · ${hrs(r.route.hours)} to ${state.target}">${esc(now.name)}</span> <span class="dim num">${short(now.boosted_xp_hr)}/hr</span>`)
+      : (r.rate_per_day ? short(r.rate_per_day) : "–");
+    return `<tr data-id="${r.id}" class="${r.id === state.skill ? "sel" : ""} ${r.id === 0 ? "overall" : ""}">
+      <td>${esc(r.name)}</td>
+      <td class="r num">${r.virtual_level ?? r.level ?? "–"}${r.level && r.virtual_level && r.virtual_level > r.level ? `<span class="dim"> (${r.level})</span>` : ""}</td>
+      <td class="r num" title="${r.xp != null ? nf.format(r.xp) : ""}">${short(r.xp)}</td>
+      <td class="r num">${r.rank > 0 ? nf.format(r.rank) : '<span class="dim">–</span>'}</td>
+      <td class="r num">${r.gain ? "+" + short(r.gain) : "<span class='dim'>0</span>"}</td>
+      <td>${t ? `<span class="bar ${done ? "done" : ""}"><i style="width:${t.pct}%"></i></span><span class="pct num">${done ? "" : t.pct.toFixed(1) + "%"}</span>${done ? ' <span class="pill">done</span>' : ""}` : ""}</td>
+      <td class="r num">${t && !done ? short(t.remaining) : ""}</td>
+      <td class="${isMethods() ? "" : "r "}num">${pace}</td>
+      <td class="r num" title="${etaDate(r.eta)}">${t && !done ? eta(r.eta) : ""}</td>
+    </tr>`;
+  }).join("");
+  renderGoal(rows);
+}
+function renderGoal(rows) {
+  const open = rows.filter(r => r.t && r.t.remaining > 0);
+  const remaining = open.reduce((a, r) => a + r.t.remaining, 0);
+  const noRate = open.filter(r => r.eta == null);
+  const slowest = open.filter(r => r.eta != null).sort((a, b) => b.eta - a.eta)[0];
+  let last;
+  if (!open.length) last = "Every skill is there.";
+  else if (usesHours()) last = "";   // per-skill ETAs each assume all your hours go to that skill
+  else if (noRate.length) last = `${noRate.length} skill${noRate.length > 1 ? "s have" : " has"} no ${state.window === "manual" ? "XP/hr set" : "recent XP"}, so there's no finish date yet (${noRate.map(r => r.name).slice(0, 4).join(", ")}${noRate.length > 4 ? "…" : ""}).`;
+  else last = `Last to finish: ${slowest.name} in ${eta(slowest.eta)}${etaDate(slowest.eta) ? " (" + etaDate(slowest.eta) + ")" : ""}.`;
+  const plan = isMethods() && state.training[state.window];
+  const training = plan && plan.total_hours != null
+    ? `<span><strong class="num">${hrs(plan.total_hours)}</strong> of ${state.window} training${hours() > 0 ? ` (${eta(plan.total_hours / hours() * 7)} at ${hours()} h a week)` : ""}</span>` : "";
+  $("#goal").innerHTML = `<b>All ${state.target}</b>
+    <span><strong class="num">${open.length}</strong> of 29 skills left</span>
+    <span><strong class="num">${short(remaining)}</strong> XP to go</span>
+    ${training}${last ? `<span>${esc(last)}</span>` : ""}`;
+}
+function renderKpis() {
+  const d = state.data, o = d.skills[0];
+  const since = d.history_starts ? new Date(d.history_starts * 1000).toLocaleDateString(undefined, { month: "short", year: "numeric" }) : null;
+  const k = (lbl, val, sub) => `<div class="kpi"><span class="lbl">${lbl}</span><span class="val num">${val}</span><span class="sub">${sub}</span></div>`;
+  const g = p => (o.gains[p] == null ? "–" : "+" + short(o.gains[p]));
+  const note = p => (d.partial[p] && since ? `History starts ${since}` : d.estimated[p] ? "Estimated from monthly totals" : "");
+  const qp = state.quests && state.quests.qp != null ? k("Quest points", `${state.quests.qp}<span class="dim" style="font-size:15px"> / ${state.quests.qp_max}</span>`, `${state.quests.counts.COMPLETED} of ${state.quests.total} quests done`) : "";
+  $("#kpis").innerHTML =
+    k("Total XP", short(o.xp), `Total level ${o.level ?? "–"}${o.rank > 0 ? " · rank " + nf.format(o.rank) : ""}`) +
+    k("Today", g("day"), note("day") || "Since 00:00 UTC reset") +
+    k("This week", g("week"), note("week") || "Since Wednesday reset") +
+    k("This month", g("month"), note("month") || new Date().toLocaleDateString(undefined, { month: "long" })) +
+    k("This year", g("year"), note("year") || "Since 1 January") + qp;
+}
+function renderStatus() {
+  const p = state.data.player;
+  if (STATIC) {
+    const when = new Date(state.data.now * 1000).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+    $("#status").textContent = `Demo: a snapshot of real RS3 Hiscores, quest and Adventurer's Log data from ${when}. Read-only. Every control except Update and Track works.`;
+    return;
+  }
+  const next = p.next_check_at ? Math.max(0, Math.round((p.next_check_at - Date.now() / 1000) / 60)) : null;
+  const st = p.status === "not_found" ? " · Hiscores can't find this name. It will be checked again daily." : "";
+  $("#status").textContent = `Hiscores checked ${ago(p.last_checked_at)}${next != null ? ` · next automatic check in ${next} min` : ""} · they update when you log out or hop worlds${st}`;
+}
+
+// ---------- charts ----------
+// Prints each bar's value at its tip, so small bars stay readable next to big ones.
+const valueLabels = {
+  id: "valueLabels",
+  afterDatasetsDraw(chart) {
+    const { ctx } = chart, horiz = chart.options.indexAxis === "y";
+    ctx.save();
+    ctx.fillStyle = css("--ink"); ctx.font = `600 12px ${css("--f-ui")}`;
+    ctx.textAlign = horiz ? "left" : "center"; ctx.textBaseline = horiz ? "middle" : "bottom";
+    chart.getDatasetMeta(0).data.forEach((el, i) => {
+      const v = chart.data.datasets[0].data[i];
+      if (v) ctx.fillText(short(v), horiz ? el.x + 6 : el.x, horiz ? el.y : el.y - 4);
+    });
+    ctx.restore();
+  },
+};
+function chartBase() {
+  Chart.defaults.color = css("--muted");
+  Chart.defaults.borderColor = css("--grid");
+  Chart.defaults.font.family = css("--f-ui");
+  Chart.defaults.font.size = 13;
+  Chart.defaults.plugins.tooltip.padding = 10;
+  Chart.defaults.plugins.tooltip.titleFont = { size: 13, weight: "600" };
+  Chart.defaults.plugins.tooltip.bodyFont = { size: 13 };
+}
+function replaceChart(key, canvas, config) {
+  if (state.charts[key]) state.charts[key].destroy();
+  state.charts[key] = new Chart(canvas, config);
+}
+function renderBySkill() {
+  if (!window.Chart || !state.data) return;
+  const rows = state.data.skills.filter(s => s.id && s.gains[state.period] > 0)
+    .sort((a, b) => b.gains[state.period] - a.gains[state.period]);
+  $("#by-skill-title").textContent = `XP gained by skill · ${periodLabel()}${state.data.estimated[state.period] ? " (estimated)" : ""}`;
+  $("#by-skill-empty").hidden = rows.length > 0;
+  $("#by-skill-box").hidden = !rows.length;
+  if (!rows.length) return;
+  $("#by-skill-box").style.height = Math.max(120, rows.length * 30 + 30) + "px";
+  const accent = css("--accent"), sel = css("--info");
+  replaceChart("bySkill", $("#c-by-skill"), {
+    type: "bar",
+    data: { labels: rows.map(r => r.name), datasets: [{ data: rows.map(r => r.gains[state.period]),
+      backgroundColor: rows.map(r => (r.id === state.skill ? sel : accent)), borderRadius: 3, barPercentage: 0.8, categoryPercentage: 0.9 }] },
+    options: {
+      indexAxis: "y", maintainAspectRatio: false, layout: { padding: { right: 56 } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => "+" + nf.format(c.raw) + " XP" } } },
+      scales: { x: { display: false, beginAtZero: true }, y: { grid: { display: false }, ticks: { color: css("--ink"), autoSkip: false } } },
+      onClick: (_, els) => { if (els.length) loadSkill(rows[els[0].index].id); },
+      onHover: (e, els) => { e.native.target.style.cursor = els.length ? "pointer" : "default"; },
+    },
+    plugins: [valueLabels],
+  });
+}
+async function loadSkill(sid) {
+  state.skill = sid;
+  document.querySelectorAll("#rows tr").forEach(tr => tr.classList.toggle("sel", Number(tr.dataset.id) === sid));
+  renderRoutes();
+  const h = await api(`/api/players/${state.pid}/skills/${sid}`);
+  $("#skill-title").textContent = h.skill;
+  if (!window.Chart) { $(".charts").innerHTML = '<p class="empty">Charts need an internet connection to load Chart.js.</p>'; return; }
+  renderBySkill();
+  const accent = css("--accent"), info = css("--info"), good = css("--good");
+
+  replaceChart("monthly", $("#c-monthly"), {
+    type: "bar",
+    data: { labels: h.monthly.map((m, i) => monthLabel(m.month, i)), datasets: [{
+      data: h.monthly.map(m => m.gain), backgroundColor: h.monthly.map(m => (m.partial ? info : accent)),
+      borderRadius: 3, minBarLength: 2 }] },
+    options: { maintainAspectRatio: false, layout: { padding: { top: 22 } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: {
+        title: i => { const m = h.monthly[i[0].dataIndex]; const [y, mo] = m.month.split("-"); return `${MONTHS[mo - 1]} ${y}${m.partial ? " (so far)" : ""}`; },
+        label: c => "+" + nf.format(c.raw) + " XP" } } },
+      scales: { y: { beginAtZero: true, ticks: { callback: v => short(v), maxTicksLimit: 6 } },
+        x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, color: css("--ink") } } } },
+    plugins: [valueLabels],
+  });
+
+  const pts = h.history.map(([t, x]) => ({ x: t * 1000, y: x }));
+  const goal = sid ? state.data.skills.find(s => s.id === sid)?.targets?.[state.target]?.target_xp : null;
+  const top = pts.length ? pts[pts.length - 1].y : 0, low = pts.length ? pts[0].y : 0;
+  const showGoal = goal && goal > top && goal - top <= Math.max(top - low, top * 0.25) * 1.5;
+  $("#history-note").textContent = goal && !showGoal && goal > top ? `${state.target} goal (${short(goal)}) is off the chart` : "";
+  const sets = [{ label: "Total XP", data: pts, borderColor: accent, backgroundColor: accent + "26", fill: true,
+    pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: accent, borderWidth: 2.5, tension: 0 }];
+  if (showGoal && pts.length)
+    sets.push({ label: `${state.target} goal`, data: [{ x: pts[0].x, y: goal }, { x: pts[pts.length - 1].x, y: goal }],
+      borderColor: good, borderDash: [6, 4], pointRadius: 0, borderWidth: 2 });
+  const minX = pts.length ? pts[0].x : 0, maxX = pts.length ? pts[pts.length - 1].x : 0;
+  const monthTicks = [];
+  for (let d = new Date(minX); d.getTime() <= maxX; d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))) {
+    const start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+    if (start >= minX) monthTicks.push(start);
+  }
+  replaceChart("history", $("#c-history"), {
+    type: "line", data: { datasets: sets },
+    options: { maintainAspectRatio: false, parsing: false,
+      interaction: { mode: "nearest", axis: "x", intersect: false },
+      plugins: { legend: { display: sets.length > 1, labels: { boxWidth: 14 } },
+        tooltip: { callbacks: { title: i => new Date(i[0].raw.x).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }),
+          label: c => `${c.dataset.label}: ${nf.format(Math.round(c.raw.y))}` } } },
+      scales: {
+        x: { type: "linear", min: minX, max: maxX, grid: { display: false },
+          afterBuildTicks: axis => { axis.ticks = monthTicks.map(v => ({ value: v })); },
+          ticks: { maxRotation: 0, autoSkip: true, color: css("--ink"), callback: v => {
+            const d = new Date(v); return d.getUTCMonth() === 0 ? `Jan '${String(d.getUTCFullYear()).slice(2)}` : MONTHS[d.getUTCMonth()]; } } },
+        y: { ticks: { callback: v => short(v), maxTicksLimit: 6 } } } },
+  });
+}
+
+// ---------- training routes ----------
+const boosts = () => store.get("boosts", { avatar: 0, outfit: false, portable: false, double: false, expensive: false });
+function boostQuery() {
+  const b = boosts();
+  return `avatar=${b.avatar || 0}&outfit=${!!b.outfit}&portable=${!!b.portable}&double=${!!b.double}&expensive=${!!b.expensive}`;
+}
+function renderBoostControls() {
+  const b = boosts();
+  $("#b-avatar").value = String(b.avatar || 0);
+  ["outfit", "portable", "double", "expensive"].forEach(k => { $("#b-" + k).checked = !!b[k]; });
+}
+async function loadTraining() {
+  const target = state.target;
+  const [fastest, easiest] = await Promise.all(MODES.map(m =>
+    api(`/api/players/${state.pid}/training?target=${target}&mode=${m}&${boostQuery()}`)));
+  if (target === state.target) state.training = { fastest, easiest };
+}
+function methodTags(g) {
+  const tags = [];
+  if (g.source === "guide") tags.push('<span class="tag" title="Rate from a third-party guide; the wiki has no hourly figure yet">guide rate</span>');
+  if (g.source === "estimate") tags.push('<span class="tag warn" title="No published rate; rough estimate">estimate</span>');
+  if (g.expensive) tags.push('<span class="tag warn">expensive</span>');
+  return tags.join(" ");
+}
+function renderRoutes() {
+  const tr = state.training;
+  if (!tr.fastest) return;
+  const sid = state.skill;
+  const label = { fastest: "Fastest", easiest: "Easiest" };
+  const week = h => (hours() > 0 && h ? ` · ${eta(h / hours() * 7)} at ${hours()} h/wk` : "");
+  if (!sid) {
+    $("#route-title").textContent = `Training route to ${state.target} · all skills`;
+    $("#routes").innerHTML = MODES.map(m => {
+      const p = tr[m], open = p.skills.filter(s => s.remaining > 0).sort((a, b) => (b.hours ?? 0) - (a.hours ?? 0));
+      return `<div class="route"><h3>${label[m]} methods <small>${hrs(p.total_hours)} total${week(p.total_hours)}</small></h3>
+        ${open.length ? `<table class="route-sum"><thead><tr><th>Skill</th><th>Start with</th><th class="r">Hours</th></tr></thead><tbody>
+        ${open.map(s => `<tr><td>${esc(s.name)}</td><td class="dim"><span class="method">${esc(s.now?.name ?? "No method listed")}</span></td><td class="r num">${hrs(s.hours)}</td></tr>`).join("")}
+        </tbody></table>` : `<p class="empty">Every skill is at ${state.target}.</p>`}
+        <p class="dim" style="margin:0;font-size:12.5px">Choose a skill in the table to see its route level by level.</p></div>`;
+    }).join("");
+    return;
+  }
+  const name = state.data.skills.find(s => s.id === sid)?.name ?? "";
+  $("#route-title").textContent = `Training route · ${name} to ${state.target}`;
+  $("#routes").innerHTML = MODES.map(m => {
+    const s = tr[m].skills.find(x => x.id === sid);
+    if (!s) return `<div class="route"><p class="empty">No Hiscores data for ${esc(name)}.</p></div>`;
+    if (!s.remaining) return `<div class="route"><h3>${label[m]} methods</h3><p class="empty">${esc(name)} is already at ${state.target}.</p></div>`;
+    const steps = s.segments.map(g => {
+      const [eff, cls] = EFFORT[g.effort] || [g.effort, ""];
+      const to = g.to_level ?? state.target;
+      const rate = g.xp_hr !== g.base_xp_hr ? `${short(g.xp_hr)} XP/hr <span class="dim">(base ${short(g.base_xp_hr)})</span>` : `${short(g.xp_hr)} XP/hr`;
+      return `<div class="step"><span class="lv">Lv ${g.from_level} → ${to}</span>
+        <span class="what"><span>${esc(g.method)} ${methodTags(g)}</span>
+          <span class="meta">${rate} · ${short(g.xp)} XP · <span class="pill ${cls}">${eff}</span></span>
+          ${g.requires ? `<span class="meta">Needs ${esc(g.requires)}</span>` : ""}
+          ${g.note ? `<span class="meta">${esc(g.note)}</span>` : ""}</span>
+        <span class="h">${hrs(g.hours)}</span></div>`;
+    }).join("");
+    const others = (s.other_methods || []).map(o => `<li><b>${esc(o.name)}</b> (level ${o.level}) · ${
+      o.xp_hr ? `${short(o.xp_hr)} XP/hr, left out because it's expensive` : esc(o.note || "no published hourly rate")}</li>`).join("");
+    return `<div class="route"><h3>${label[m]} methods <small>${hrs(s.hours)}${week(s.hours)}</small></h3>${steps ||
+      `<p class="empty">No method in methods.json for level ${s.missing_method_at}.</p>`}
+      ${others ? `<ul class="others"><li>Also possible, not counted in the hours:</li>${others}</ul>` : ""}</div>`;
+  }).join("");
+}
+
+// ---------- activities, quests, events ----------
+function renderActivities() {
+  $("#act-gain").textContent = periodLabel();
+  const rows = [...state.activities].sort((a, b) => (b.name === "RuneScore") - (a.name === "RuneScore") || a.name.localeCompare(b.name));
+  $("#activities").innerHTML = rows.length ? rows.map(a => `<tr>
+      <td>${esc(a.name)}</td>
+      <td class="r num">${nf.format(a.score)}</td>
+      <td class="r num">${a.rank > 0 ? nf.format(a.rank) : '<span class="dim">–</span>'}</td>
+      <td class="r num">${a.gains[state.period] ? "+" + nf.format(a.gains[state.period]) : '<span class="dim">0</span>'}</td>
+    </tr>`).join("")
+    : '<tr><td colspan="4" class="empty">No activity scores yet. They appear after the next Hiscores check.</td></tr>';
+}
+function renderQuests() {
+  const q = state.quests;
+  if (!q || !q.total) {
+    $("#qp").innerHTML = '<p class="empty" style="padding:0">Quest data appears after the next check (every 6 hours).</p>';
+    $("#quest-tabs").innerHTML = ""; $("#quests").innerHTML = ""; return;
+  }
+  $("#quests-checked").textContent = "checked " + ago(q.checked_at);
+  $("#qp").innerHTML = `<div class="row" style="display:flex;justify-content:space-between;align-items:baseline">
+      <span><span class="big num">${q.qp}</span> <span class="dim">/ ${q.qp_max} quest points</span></span>
+      <span class="dim num">${((q.qp / q.qp_max) * 100).toFixed(1)}%</span></div>
+    <span class="bar"><i style="width:${(q.qp / q.qp_max) * 100}%"></i></span>
+    <div class="chips"><span class="pill">${q.counts.COMPLETED} completed</span><span class="pill gold">${q.counts.STARTED} started</span><span class="pill info">${q.counts.NOT_STARTED} not started</span></div>`;
+  const groups = {
+    ready: ["Ready to start", q.open.filter(x => x.status === "NOT_STARTED" && x.eligible)],
+    started: ["In progress", q.open.filter(x => x.status === "STARTED")],
+    locked: ["Requirements not met", q.open.filter(x => x.status === "NOT_STARTED" && !x.eligible)],
+    recent: ["Recently completed", q.recent],
+  };
+  $("#quest-tabs").innerHTML = Object.entries(groups).map(([k, [l, xs]]) =>
+    `<button type="button" data-tab="${k}" aria-pressed="${k === state.questTab}">${l} (${xs.length})</button>`).join("");
+  const [, list] = groups[state.questTab];
+  $("#quests").innerHTML = list.length ? list.map(x => `<li><div class="row"><span>${esc(x.title)}</span>
+      <span class="meta">${x.qp ? x.qp + " QP" : ""}</span></div>
+      <span class="meta">${DIFFICULTY[x.difficulty] ?? ""}${x.members ? " · members" : " · free"}${x.completed_seen_at ? " · completed " + ago(x.completed_seen_at) : ""}</span></li>`).join("")
+    : `<li class="empty">${state.questTab === "recent" ? "Quests you finish from now on will show here." : "Nothing here."}</li>`;
+}
+// "84000000XP in Smithing" -> "84,000,000 XP in Smithing"; other 5+ digit numbers get commas too.
+const eventText = s => String(s)
+  .replace(/(\d+)\s*XP\b/gi, (_, n) => nf.format(Number(n)) + " XP")
+  .replace(/\b\d{5,}\b/g, n => nf.format(Number(n)));
+function eventTag(type) {
+  const hit = EVENT_TAGS.find(([re]) => re.test(type));
+  return hit ? `<span class="pill ${hit[2]}">${hit[1]}</span>` : '<span class="pill info">Event</span>';
+}
+async function loadEvents() {
+  const ev = await api(`/api/players/${state.pid}/events?limit=30`);
+  $("#events").innerHTML = ev.length
+    ? ev.map(e => `<li><div class="row"><span title="${esc(eventText(e.details))}">${esc(eventText(e.text))}</span>${eventTag(e.type)}</div>
+        <time datetime="${new Date(e.date * 1000).toISOString()}">${new Date(e.date * 1000).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</time></li>`).join("")
+    : '<li class="empty">No events yet. Events need membership and RuneMetrics logging turned on in-game.</li>';
+}
+
+// ---------- controls ----------
+function seg(el, items, current, onPick) {
+  el.innerHTML = items.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${String(v) === String(current)}">${l}</button>`).join("");
+  el.onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    const raw = b.dataset.v, v = isNaN(raw) ? raw : Number(raw);
+    el.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    onPick(v);
+  };
+}
+function renderControls() {
+  seg($("#seg-target"), TARGETS.map(t => [t, t]), state.target, async v => {
+    state.target = v; store.set("target", v);
+    try { await loadTraining(); } catch (e) { notice(e.message, true); }
+    renderTable(); loadSkill(state.skill);
+  });
+  seg($("#seg-window"), WINDOWS, state.window, v => { state.window = v; store.set("window", v); $("#hours-ctl").hidden = !usesHours(); loadSummary(); });
+  seg($("#seg-period"), PERIODS, state.period, v => { state.period = v; store.set("period", v); renderTable(); renderBySkill(); renderActivities(); });
+  $("#hours-ctl").hidden = !usesHours();
+  $("#hours").value = hours();
+}
+async function loadSummary() {
+  const w = typeof state.window === "number" ? state.window : 30;
+  state.data = await api(`/api/players/${state.pid}/summary?window=${w}`);
+  renderKpis(); renderStatus(); renderTable();
+}
+async function loadExtras() {
+  [state.activities, state.quests] = await Promise.all([
+    api(`/api/players/${state.pid}/activities`), api(`/api/players/${state.pid}/quests`)]);
+  renderActivities(); renderQuests(); renderKpis();
+}
+async function loadPlayers(selectId) {
+  const ps = await api("/api/players");
+  const sel = $("#player");
+  if (!ps.length) {
+    sel.hidden = true; $("#refresh").hidden = true;
+    $("#kpis").innerHTML = ""; $("#goal").innerHTML = "<b>Track a player to begin.</b><span>Enter a RuneScape 3 display name above and choose Track.</span>";
+    return false;
+  }
+  sel.hidden = false; $("#refresh").hidden = false;
+  sel.innerHTML = ps.map(p => `<option value="${p.id}">${esc(p.display_name)}</option>`).join("");
+  const want = selectId ?? state.pid;
+  state.pid = ps.some(p => p.id === want) ? want : ps[0].id;
+  sel.value = state.pid; store.set("pid", state.pid);
+  return true;
+}
+async function loadAll() {
+  try {
+    if (window.Chart) chartBase();
+    state.training = {};
+    await loadTraining();
+    await loadSummary();
+    await Promise.all([loadSkill(state.skill), loadEvents(), loadExtras()]);
+  } catch (e) { notice(e.message, true); }
+}
+
+$("#player").onchange = e => { state.pid = Number(e.target.value); store.set("pid", state.pid); state.skill = 0; loadAll(); };
+$("#rows").addEventListener("click", e => {
+  if (e.target.closest("input")) return;
+  const tr = e.target.closest("tr"); if (tr) loadSkill(Number(tr.dataset.id)).catch(err => notice(err.message, true));
+});
+$("#rows").addEventListener("change", e => {
+  const id = e.target.dataset.xphr; if (!id) return;
+  const m = manual(); m[id] = Number(e.target.value) || 0; store.set(manualKey(), m); renderTable();
+});
+$("#hours").onchange = e => { store.set("hours", Number(e.target.value) || 0); renderTable(); renderRoutes(); };
+$("#boosts").addEventListener("change", async () => {
+  store.set("boosts", { avatar: Number($("#b-avatar").value), outfit: $("#b-outfit").checked,
+    portable: $("#b-portable").checked, double: $("#b-double").checked, expensive: $("#b-expensive").checked });
+  try { await loadTraining(); renderTable(); renderRoutes(); } catch (e) { notice(e.message, true); }
+});
+$("#quest-tabs").onclick = e => { const b = e.target.closest("button"); if (b) { state.questTab = b.dataset.tab; renderQuests(); } };
+document.querySelectorAll("th[data-sort]").forEach(th => th.onclick = () => {
+  const key = th.dataset.sort;
+  state.sort = { key, dir: state.sort.key === key ? -state.sort.dir : (["id", "eta"].includes(key) ? 1 : -1) };
+  renderTable();
+});
+$("#refresh").onclick = async () => {
+  const b = $("#refresh"); b.disabled = true; b.textContent = "Updating…";
+  try {
+    const r = await api(`/api/players/${state.pid}/refresh`, { method: "POST" });
+    if (!r.polled) notice(`Checked less than 5 minutes ago. You can update again in ${Math.ceil(r.retry_in / 60)} min.`);
+    else if (r.status === "unavailable") notice("Hiscores didn't respond. The collector will try again shortly.", true);
+    else if (r.status === "not_found") notice("Hiscores can't find this name. Check the spelling or a recent name change.", true);
+    else notice("");
+    await loadAll();
+  } catch (e) { notice(e.message, true); }
+  b.disabled = false; b.textContent = "Update now";
+};
+$("#add-form").onsubmit = async e => {
+  e.preventDefault();
+  const name = $("#add-name").value.trim(); if (!name) return;
+  notice(`Looking up ${name} on the Hiscores…`);
+  try {
+    const p = await api("/api/players", { method: "POST", body: JSON.stringify({ name }) });
+    $("#add-name").value = "";
+    notice(p.status === "not_found" ? `${p.display_name} isn't on the RuneScape Hiscores. They'll be checked again daily.` : `Now tracking ${p.display_name}.`, p.status === "not_found");
+    await loadPlayers(p.id); state.skill = 0; await loadAll();
+  } catch (err) { notice(err.message, true); }
+};
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (state.data) { chartBase(); loadSkill(state.skill); } });
+
+(async () => {
+  // Opened straight from disk: the API only exists on the local server, so go there.
+  if (location.protocol === "file:" && !STATIC) {
+    notice(`This page runs from the planner server. Opening ${SERVER} …`);
+    location.replace(SERVER);
+    return;
+  }
+  if (STATIC) {
+    $("#refresh").classList.add("demo-off"); $("#add-form").classList.add("demo-off");
+    // "auto": on <owner>.github.io/<repo>/ link back to github.com/<owner>/<repo>, so no
+    // account name has to be written into the published files.
+    let repo = STATIC.repo;
+    if (repo === "auto" && location.hostname.endsWith(".github.io")) {
+      const name = location.pathname.split("/").filter(Boolean)[0];
+      repo = name ? `https://github.com/${location.hostname.split(".")[0]}/${name}` : null;
+    } else if (repo === "auto") repo = null;
+    if (repo) $(".brand small").innerHTML = `Demo · <a href="${esc(repo)}">get it on GitHub</a>`;
+  }
+  renderControls();
+  renderBoostControls();
+  try {
+    if (await loadPlayers()) await loadAll();
+  } catch (e) { notice(e.message, true); }
+  if (!STATIC) setInterval(() => state.pid && loadSummary().then(loadExtras).catch(() => {}), 5 * 60 * 1000);
+})();
+</script>
+</body>
+</html>
