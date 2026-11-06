@@ -19,6 +19,7 @@ Security pass:
 - Docker: read-only filesystem, all capabilities dropped, no privilege escalation, memory and
   process limits. Dependencies and GitHub Actions are pinned to exact versions, and the tests
   workflow gets a read-only token.
+- Needs Python 3.15, the same version the Docker image uses. That's the only version tested.
 
 Also:
 
@@ -46,7 +47,7 @@ Also:
   also fixed the tab icon. Files are sent with `no-cache` so an update never runs old JS.
 - The demo isn't committed any more. GitHub builds it from `demo/fixture.json` on every push,
   which got rid of the `docs/` folder and its 51 JSON files.
-- Docker runs Python 3.15. Tests run on 3.10 and 3.15.
+- Docker runs Python 3.15.
 - The "99" logo is in the top bar and the browser tab.
 - Up to a year of history again, from monthly totals saved before RuneMetrics closed.
 - Screenshots moved to `assets/`. `demo-fixture` and `build-demo` replace `export-demo`.

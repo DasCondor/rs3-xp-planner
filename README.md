@@ -8,7 +8,7 @@
 <br>Self-hosted, and built on Jagex's new RuneScape Platform API.
 
 [![tests](../../actions/workflows/tests.yml/badge.svg)](../../actions/workflows/tests.yml)
-![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
+![Python 3.15](https://img.shields.io/badge/python-3.15-3776AB?logo=python&logoColor=white)
 ![Docker](https://img.shields.io/badge/docker-compose%20up-2496ED?logo=docker&logoColor=white)
 ![RuneScape Platform API](https://img.shields.io/badge/RuneScape-Platform%20API-1f6b63)
 ![No API key](https://img.shields.io/badge/API%20key-not%20needed-a8790f)
@@ -131,7 +131,7 @@ Then open **http://127.0.0.1:8765**. To update later, run
 
 <br>
 
-You need Python 3.10 or newer.
+You need Python 3.15.
 
 ```bash
 pip install -r requirements.txt
