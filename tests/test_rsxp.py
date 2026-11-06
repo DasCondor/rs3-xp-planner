@@ -337,26 +337,54 @@ def test_boost_tables_name_real_skills():
     from rsxp.xp import SKILLS
     doc = training.load()
     for table in ("outfits", "portables"):
-        for skill, v in training.per_skill(doc["boosts"][table]).items():
+        for skill, v in doc["boosts"][table].items():
             assert skill in SKILLS and 0 < v["percent"] <= 25 and v["item"], (table, skill)
 
 
 # --- static demo export -------------------------------------------------------
 
-def test_export_demo_hides_real_name(conn, tmp_path):
+def test_demo_fixture_round_trip_and_site(conn, tmp_path):
     from rsxp import demo
     pid = db.add_player(conn, "Secret Name")
     db.save_hiscores(conn, pid, hiscores_payload({sid: 1_000_000 for sid in range(30)}), now=ts(2026, 11, 1))
     db.save_hiscores(conn, pid, hiscores_payload({sid: 1_500_000 for sid in range(30)}), now=ts(2026, 11, 4))
-    n = demo.export(conn, "Secret Name", tmp_path, "Demo Player", now=ts(2026, 11, 5))
-    files = list((tmp_path / "data").glob("*.json"))
-    assert n == len(files) == 51
-    html = (tmp_path / "index.html").read_text(encoding="utf-8")
-    assert "window.RSXP_STATIC" in html
-    for f in files + [tmp_path / "index.html"]:
+    db.save_events(conn, pid, {"events": [{"date": "2026-11-02T10:00:00Z", "type": "rs_plog_xp_milestone",
+                                           "text": "2000000XP in Attack", "details": ""}]})
+    db.save_quests(conn, pid, {"qp": 3, "qp_max": 5, "quests": {"1": {"title": "Cold Front", "difficulty": 0,
+        "members": False, "qp": 1, "eligible": True, "status": "COMPLETED"}}}, now=ts(2026, 11, 4))
+
+    fx = tmp_path / "fixture.json"
+    demo.dump_fixture(conn, "Secret Name", fx)
+    assert "secret" not in fx.read_text(encoding="utf-8").lower()
+
+    # the fixture rebuilds the same numbers as the real database
+    conn2, name, now = demo.load_fixture(fx)
+    assert name == "Demo Player" and now == ts(2026, 11, 4)
+    pid2 = db.get_player(conn2, name)["id"]
+    a = planner.summary(conn, pid, now, 30)["skills"]
+    b = planner.summary(conn2, pid2, now, 30)["skills"]
+    assert [(s["xp"], s["gains"]) for s in a] == [(s["xp"], s["gains"]) for s in b]
+
+    site = tmp_path / "site"
+    n = demo.build_site(conn2, name, site, now=now)
+    assert n == len(list((site / "data").glob("*.json"))) == 52
+    for asset in ("index.html", "app.css", "app.js", "theme.js", "logo.svg"):
+        assert (site / asset).exists(), asset
+    assert "window.RSXP_STATIC" in (site / "index.html").read_text(encoding="utf-8")
+    for f in site.rglob("*.*"):
         assert "secret" not in f.read_text(encoding="utf-8").lower(), f.name
-    summary = json.loads((tmp_path / "data" / "summary-30.json").read_text())
-    assert summary["player"]["display_name"] == "Demo Player" and summary["skills"][1]["xp"] == 1_500_000
+
+
+def test_server_serves_only_page_assets():
+    from fastapi.testclient import TestClient
+    from rsxp.server import create_app
+    c = TestClient(create_app(":memory:", collect=False))
+    assert c.get("/").status_code == 200
+    for asset in ("", "app.css", "app.js", "theme.js", "logo.svg"):
+        r = c.get(f"/{asset}")
+        assert r.status_code == 200 and r.headers["cache-control"] == "no-cache", asset
+    assert c.get("/server.py").status_code == 404
+    assert c.get("/methods.json").status_code == 404
 
 
 # --- docker / env settings ------------------------------------------------------
@@ -375,3 +403,37 @@ def test_db_path_from_env(monkeypatch, tmp_path):
     monkeypatch.setenv("RSXP_DB", str(target))
     cli.main(["add", "Zezima"])
     assert target.exists()
+
+
+def test_slayer_creatures_need_the_slayer_level():
+    doc = {"boosts": {"outfits": {}, "portables": {}, "double": {"percent": 100}}, "skills": {"Attack": [
+        {"level": 1, "name": "basic", "xp_hr": 40_000, "effort": "low"},
+        {"level": 1, "name": "scorpions", "xp_hr": 500_000, "effort": "afk", "slayer": 88},
+        {"level": 1, "name": "demons", "xp_hr": None, "effort": "low", "slayer": 85}]}}
+    def attack_plan(slayer_level):
+        latest = {1: {"xp": 0, "level": 1}, 19: {"xp": 0, "level": slayer_level}}
+        return next(s for s in training.plan(latest, "99", "fastest", doc=doc)["skills"] if s["name"] == "Attack")
+    low = attack_plan(80)
+    assert low["now"]["name"] == "basic"
+    assert {o["name"]: o.get("locked") for o in low["other_methods"]} == {
+        "scorpions": "needs 88 Slayer (you have 80)", "demons": "needs 85 Slayer (you have 80)"}
+    high = attack_plan(90)
+    assert high["now"]["name"] == "scorpions" and high["segments"][0]["requires"] == "88 Slayer"
+    assert [o["name"] for o in high["other_methods"]] == ["demons"]          # no rate, still listed
+
+
+def test_compact_rows_expand():
+    doc = training.load()
+    m = next(m for m in doc["skills"]["Attack"] if m["name"].startswith("Corrupted scorpions"))
+    assert m == {"level": 80, "name": "Corrupted scorpions (Sophanem)", "xp_hr": 500000, "effort": "afk",
+                 "slayer": 88, "requires": "tier 90 gear"}
+    assert doc["boosts"]["portables"]["Cooking"] == {"item": "Portable range", "percent": 21}
+
+
+def test_creatures_table():
+    c = training.load()["creatures"]
+    assert {"Attack", "Ranged", "Magic", "Necromancy", "Hitpoints"} <= set(c["skills"])
+    strigoi = next(x for x in c["list"] if x["name"] == "Ravenous strigoi")
+    assert strigoi == {"level": 90, "name": "Ravenous strigoi", "kill": 5160, "slayer": 104,
+                       "requires": "Heralds of Crimson (partial)"}
+    assert all(x["kill"] > 0 and x["name"] for x in c["list"])

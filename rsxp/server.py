@@ -14,6 +14,9 @@ from . import collector, db, gains, planner, training
 from .xp import SKILLS, TARGETS
 
 STATIC = Path(__file__).resolve().parent / "static"
+STATIC_ASSETS = {"app.css", "app.js", "theme.js", "logo.svg"}
+# Revalidate every load (cheap, via ETag) so an updated app.js never runs against a stale cache.
+NO_CACHE = {"Cache-Control": "no-cache"}
 
 
 class NewPlayer(BaseModel):
@@ -61,7 +64,14 @@ def create_app(db_path=db.DEFAULT_DB, collect: bool = True) -> FastAPI:
 
     @app.get("/", include_in_schema=False)
     def index():
-        return FileResponse(STATIC / "index.html")
+        return FileResponse(STATIC / "index.html", headers=NO_CACHE)
+
+    @app.get("/{asset}", include_in_schema=False)
+    def asset(asset: str):
+        # Only the page's own files; nothing else in the package is reachable.
+        if asset not in STATIC_ASSETS:
+            raise HTTPException(404, "Not found")
+        return FileResponse(STATIC / asset, headers=NO_CACHE)
 
     @app.get("/api/players")
     def list_players():
@@ -104,6 +114,11 @@ def create_app(db_path=db.DEFAULT_DB, collect: bool = True) -> FastAPI:
             pts = gains.load_series(conn, pid).get(sid, [])
             return {"skill": SKILLS[sid], "history": gains.downsample(pts),
                     "monthly": gains.monthly(pts, int(time.time())), "daily": gains.daily(pts, int(time.time()))}
+
+    @app.get("/api/training/creatures")
+    def training_creatures():
+        c = training.load()["creatures"]
+        return {"skills": c["skills"], "list": c["list"]}
 
     @app.get("/api/training/boosts")
     def training_boosts():

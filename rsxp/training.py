@@ -18,16 +18,17 @@ EFFORT_ORDER = {"afk": 0, "low": 1, "high": 2}
 
 
 def load(path: Path = METHODS_FILE) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def load_methods(path: Path = METHODS_FILE) -> dict[str, list[dict]]:
-    return load(path)["skills"]
-
-
-def per_skill(cfg: dict) -> dict[str, dict]:
-    """The outfits/portables tables without their _about note."""
-    return {k: v for k, v in cfg.items() if not k.startswith("_")}
+    """Read methods.json, expanding its compact rows into dicts."""
+    d = json.loads(path.read_text(encoding="utf-8"))
+    keys = ("level", "name", "xp_hr", "effort")
+    d["skills"] = {s: [{**dict(zip(keys, r)), **(r[4] if len(r) > 4 else {})} for r in rows]
+                   for s, rows in d["skills"].items()}
+    for t in ("outfits", "portables"):
+        d["boosts"][t] = {s: {"item": item, "percent": pct} for s, (item, pct) in d["boosts"][t].items()}
+    d["boosts"]["double"] = {"percent": d["boosts"]["double"]}
+    d["creatures"]["list"] = [{**dict(zip(("level", "name", "kill"), r)), **(r[3] if len(r) > 3 else {})}
+                              for r in d["creatures"]["list"]]
+    return d
 
 
 def multiplier(skill: str, boosts: dict, doc: dict) -> float:
@@ -36,10 +37,10 @@ def multiplier(skill: str, boosts: dict, doc: dict) -> float:
     without an outfit or portable in methods.json are ignored."""
     cfg = doc.get("boosts", {})
     mult = 1 + (boosts.get("avatar") or 0) / 100
-    outfit = per_skill(cfg.get("outfits", {})).get(skill)
+    outfit = cfg.get("outfits", {}).get(skill)
     if outfit and skill in (boosts.get("outfits") or ()):
         mult *= 1 + outfit["percent"] / 100
-    portable = per_skill(cfg.get("portables", {})).get(skill)
+    portable = cfg.get("portables", {}).get(skill)
     if portable and skill in (boosts.get("portables") or ()):
         mult *= 1 + portable["percent"] / 100
     if boosts.get("double"):
@@ -88,7 +89,9 @@ def route(skill_id: int, xp: int, goal_xp: int, methods: list[dict], mode: str,
         else:
             segments.append({"method": m["name"], "effort": m["effort"], "base_xp_hr": m["xp_hr"],
                              "xp_hr": round(rate), "source": m.get("source", "wiki"),
-                             "requires": m.get("requires"), "note": m.get("note"),
+                             "requires": ", ".join(filter(None, [m.get("slayer") and f"{m['slayer']} Slayer",
+                                                                 m.get("requires")])) or None,
+                             "note": m.get("note"),
                              "expensive": bool(m.get("expensive")),
                              "from_level": lvl, "xp": gained, "hours": gained / rate})
         cur = end
@@ -103,20 +106,24 @@ def plan(latest: dict[int, dict], target: str, mode: str, boosts: dict | None = 
     to a row with xp and level (Hiscores)."""
     doc = doc or load()
     boosts = boosts or {}
+    slayer = (latest.get(SKILLS.index("Slayer")) or {}).get("level") or 1
     skills = []
     for sid in range(1, len(SKILLS)):
         row = latest.get(sid)
         if not row or row["xp"] < 0:
             continue
         name = SKILLS[sid]
-        methods = doc["skills"].get(name, [])
+        # Slayer creatures only count once your Slayer level allows them
+        locked = [{**m, "locked": f"needs {m['slayer']} Slayer (you have {slayer})"}
+                  for m in doc["skills"].get(name, []) if m.get("slayer", 0) > slayer]
+        methods = [m for m in doc["skills"].get(name, []) if m.get("slayer", 0) <= slayer]
         mult = multiplier(name, boosts, doc)
         goal = target_xp(sid, target)
         lvl_now = row["level"] if sid == INVENTION else virtual_level(sid, row["xp"])
         r = route(sid, row["xp"], goal, methods, mode, row["level"], mult, allow_expensive)
         now = best_method(methods, lvl_now, mode, allow_expensive)
         others = [m for m in methods if not m.get("xp_hr")
-                  or (m.get("expensive") and not allow_expensive)]
+                  or (m.get("expensive") and not allow_expensive)] + locked
         skills.append({"id": sid, "name": name, "xp": row["xp"], "goal_xp": goal,
                        "remaining": max(goal - row["xp"], 0), "multiplier": round(mult, 4),
                        "now": now and {**now, "boosted_xp_hr": round(now["xp_hr"] * mult)},

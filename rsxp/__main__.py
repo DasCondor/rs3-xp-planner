@@ -9,7 +9,6 @@ from pathlib import Path
 
 from . import collector, db, planner
 
-ROOT = Path(__file__).resolve().parent.parent
 
 
 def fmt_eta(days):
@@ -42,11 +41,13 @@ def main(argv=None):
     p.add_argument("name")
     p.add_argument("--target", choices=["99", "120", "200m"], default="120")
     p.add_argument("--window", type=int, choices=planner.RATE_WINDOWS, default=30)
-    p = sub.add_parser("export-demo", help="build the static GitHub Pages demo from one player's data")
+    p = sub.add_parser("demo-fixture", help="save one player's data as the demo fixture (renamed)")
     p.add_argument("name")
-    p.add_argument("--out", default=str(ROOT / "docs"))
-    p.add_argument("--as", dest="display_as", default="Demo Player",
-                   help='name shown in the demo (default "Demo Player"; pass the real name to keep it)')
+    p.add_argument("--as", dest="display_as", default="Demo Player", help='name shown in the demo (default "Demo Player")')
+    p.add_argument("--out", default=None, help="default: demo/fixture.json")
+    p = sub.add_parser("build-demo", help="build the static demo site from the fixture (CI does this)")
+    p.add_argument("--fixture", default=None, help="default: demo/fixture.json")
+    p.add_argument("--out", default="_site")
     p.add_argument("--repo", default="auto",
                    help='repository URL to link from the demo; "auto" (default) works it out on GitHub Pages')
     p = sub.add_parser("serve", help="run the dashboard and the hourly collector")
@@ -55,6 +56,13 @@ def main(argv=None):
     p.add_argument("--no-collector", action="store_true")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+
+    if args.cmd == "build-demo":
+        from . import demo
+        conn, name, now = demo.load_fixture(Path(args.fixture) if args.fixture else demo.FIXTURE)
+        n = demo.build_site(conn, name, Path(args.out), args.repo, now)
+        print(f"built {Path(args.out) / 'index.html'} with {n} data files")
+        return
 
     if args.cmd == "serve":
         import uvicorn
@@ -71,10 +79,12 @@ def main(argv=None):
                 print(collector.poll(conn, need_player(conn, args.name)))
             else:
                 print(f"polled {collector.run_due(conn)} player(s)")
-        elif args.cmd == "export-demo":
-            from .demo import export
-            n = export(conn, args.name, Path(args.out), args.display_as, args.repo)
-            print(f"wrote {Path(args.out) / 'index.html'} and {n} data files")
+        elif args.cmd == "demo-fixture":
+            from . import demo
+            out = Path(args.out) if args.out else demo.FIXTURE
+            f = demo.dump_fixture(conn, args.name, out, args.display_as)
+            print(f"wrote {out} ({out.stat().st_size // 1024} KB: {len(f['snapshots'])} snapshots, "
+                  f"{len(f['events'])} events, {len(f['quests'])} quests)")
         elif args.cmd == "plan":
             player = need_player(conn, args.name)
             s = planner.summary(conn, player["id"], int(time.time()), args.window)

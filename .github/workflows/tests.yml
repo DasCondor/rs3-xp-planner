@@ -7,18 +7,17 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.13"]
+        # oldest supported and the current release
+        python-version: ["3.10", "3.15"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install -r requirements.txt pytest
+      - run: pip install -r requirements.txt pytest httpx
       - run: python -m pytest -q tests
-      - name: Syntax-check the dashboard script
-        run: |
-          python tests/extract_page_js.py
-          node --check page.js
+      - name: Syntax-check the dashboard scripts
+        run: node --check rsxp/static/app.js && node --check rsxp/static/theme.js
 
   docker:
     runs-on: ubuntu-latest
@@ -36,6 +35,7 @@ jobs:
           done
           curl -fs http://127.0.0.1:8765/api/players
           curl -fs http://127.0.0.1:8765/ | grep -q "rs3 xp planner"
+          for f in app.css app.js theme.js logo.svg; do curl -fs -o /dev/null "http://127.0.0.1:8765/$f"; done
           docker exec planner python -m rsxp --help >/dev/null
       - name: Logs
         if: always()

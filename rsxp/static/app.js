@@ -1,343 +1,5 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>rs3 xp planner (demo)</title>
-<script>window.RSXP_STATIC = {"base": "data/", "repo": "auto"};</script>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"%3E %3Crect width="96" height="96" rx="14" fill="%231f6b63"/%3E %3Crect x="7" y="7" width="82" height="82" rx="9" fill="none" stroke="%23e4b84f" stroke-width="3"/%3E %3Ctext x="48" y="61" font-family="Bahnschrift%2C 'Arial Narrow'%2C Arial%2C sans-serif" font-weight="700" font-size="40" fill="%23e4b84f" text-anchor="middle"%3E99%3C/text%3E %3Crect x="22" y="70" width="52" height="5" fill="%230f3d38"/%3E %3Crect x="22" y="70" width="38" height="5" fill="%23e4b84f"/%3E %3C/svg%3E">
-<script>try{const t=JSON.parse(localStorage.getItem("rsxp.theme"));if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch{}</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
-<style>
-/* One column, laid out like a character sheet: who you are, what you gained, then the skill grid. */
-:root{
-  --c-combat:#8e2418;--c-gathering:#2c5e17;--c-artisan:#1b4785;--c-support:#05586a;--c-elite:#55288a;
-  --bg:#e9ecea; --panel:#f8faf9; --ink:#121719; --muted:#3f4b4e; --good-ink:#7a5500; --line:#d3dad7; --grid:#e4e9e7;
-  --accent:#1f6b63; --info:#86b9b0; --good:#a8790f; --warn:#a4451d; --sel:#dcebe7; --track:#d9e0dd;
-  --f-ui:"Barlow","Segoe UI",system-ui,sans-serif;
-  --f-head:"Barlow Semi Condensed",Bahnschrift,"Arial Narrow",sans-serif;
-  color-scheme:light;
-}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#111514; --panel:#181d1c; --ink:#e2e8e5; --muted:#93a29d; --line:#2a3230; --grid:#212826;
-  --accent:#62b8aa; --info:#2f6158; --good:#d8aa45; --good-ink:#d8aa45; --warn:#e48a5f; --sel:#1f2e2b; --track:#28312f;
-  --c-combat:#f08672;--c-gathering:#8fd06f;--c-artisan:#7fb0f0;--c-support:#56c6dc;--c-elite:#c29bf2;
-  color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#111514; --panel:#181d1c; --ink:#e2e8e5; --muted:#93a29d; --line:#2a3230; --grid:#212826;
-  --accent:#62b8aa; --info:#2f6158; --good:#d8aa45; --good-ink:#d8aa45; --warn:#e48a5f; --sel:#1f2e2b; --track:#28312f;
-  --c-combat:#f08672;--c-gathering:#8fd06f;--c-artisan:#7fb0f0;--c-support:#56c6dc;--c-elite:#c29bf2;
-  color-scheme:dark}
-*{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
-[hidden],.demo-off{display:none!important}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-ui)}
-.num,td,dd{font-variant-numeric:tabular-nums}
-a{color:var(--accent)}
-h2,h3{font-family:var(--f-head);font-weight:600;margin:0;letter-spacing:.01em}
-h2{font-size:21px}
-h3{font-size:16px}
-select,input,button{font:inherit;color:inherit}
-input,select{background:var(--panel);border:1px solid var(--line);border-radius:2px;padding:5px 8px}
-button{cursor:pointer;background:none;border:1px solid var(--line);border-radius:2px;padding:5px 11px;font-family:var(--f-head);font-weight:600;font-size:14px}
-button:hover{border-color:var(--muted)}
-button:disabled{opacity:.5;cursor:default}
-:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.dim{color:var(--muted)}
-
-/* top strip */
-.topbar{border-bottom:1px solid var(--line)}
-.topbar-in{max-width:1240px;margin:0 auto;padding:8px 20px;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;font-size:13.5px}
-.mark{font-family:var(--f-head);font-weight:700;letter-spacing:.06em;text-transform:lowercase}
-.status{color:var(--muted);margin-right:auto}
-.actions{display:flex;gap:8px;align-items:center}
-form.add{display:flex;gap:6px}
-form.add input{width:150px}
-
-.wrap{max-width:1240px;margin:0 auto;padding:22px 20px 56px;display:grid;gap:30px}
-.notice{padding:9px 12px;background:var(--sel);font-size:14px}
-.notice.err{color:var(--warn)}
-
-/* the sheet header */
-.sheet{display:grid;gap:18px}
-#player{appearance:none;-webkit-appearance:none;border:0;background:transparent;padding:0 22px 0 0;
-  font:700 40px/1.05 var(--f-head);letter-spacing:-.005em;cursor:pointer;max-width:100%;
-  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
-  background-position:right 6px top 58%,right 0 top 58%;background-size:6px 6px;background-repeat:no-repeat}
-#player option{font-size:16px}
-.totals{margin:4px 0 0;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 22px}
-.totals b{color:var(--ink);font-weight:600}
-.gains{margin:0;display:flex;flex-wrap:wrap;gap:12px 44px}
-.gains div{display:grid}
-.gains dt{font-size:13px;color:var(--muted)}
-.gains dd{margin:0;font:600 30px/1.1 var(--f-head)}
-.gains small{font-size:12px;color:var(--muted)}
-
-/* controls */
-.toolbar{display:flex;flex-wrap:wrap;gap:12px 32px;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--line)}
-.ctl{display:flex;gap:10px;align-items:center}
-.ctl > span{font-family:var(--f-head);font-weight:600;font-size:14px;color:var(--muted)}
-.seg{display:inline-flex;gap:14px}
-.seg button{border:0;padding:3px 0;font-size:15px;color:var(--muted);border-bottom:2px solid transparent;border-radius:0}
-.seg button:hover{color:var(--ink)}
-.seg button[aria-pressed="true"]{color:var(--ink);border-bottom-color:var(--accent)}
-
-/* sections */
-section{min-width:0}
-.sec-head{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:baseline;margin-bottom:10px}
-.sec-head p{margin:0;color:var(--muted)}
-.sec-head p b{color:var(--ink);font-weight:600}
-.panel{background:var(--panel);min-width:0}
-.scroll{overflow-x:auto}
-table{border-collapse:collapse;width:100%}
-th,td{padding:6px 10px;text-align:left;white-space:nowrap}
-th{font:600 15px var(--f-head);color:var(--ink);border-bottom:2px solid var(--ink);vertical-align:bottom;padding-top:8px;padding-bottom:7px}
-td{border-bottom:1px solid var(--grid)}
-th.r,td.r{text-align:right}
-th[data-sort]{cursor:pointer}
-th[data-sort]:hover{color:var(--ink)}
-.skills table{min-width:900px}
-.skills td:first-child{font-weight:500}
-.skills tbody tr{cursor:pointer}
-.skills tbody tr:hover{background:var(--sel)}
-.skills tbody tr.sel{background:var(--sel)}
-tr.overall td{font-weight:600;border-bottom:1px solid var(--line)}
-.foot{margin:8px 0 0;font-size:13px;color:var(--muted)}
-.bar{width:150px;height:5px;background:var(--track);display:inline-block;vertical-align:middle}
-.bar i{display:block;height:100%;background:var(--c,var(--accent))}
-.bar.done i{background:var(--good)}
-.pct{display:inline-block;width:52px;text-align:right;color:var(--muted);font-size:13px}
-.pill{font:600 13px/1 var(--f-head);color:var(--muted);white-space:nowrap}
-.pill:not(.info):not(.warn):not(.gold){color:var(--good-ink,var(--good))}
-.pill.info{color:var(--accent)}
-.pill.warn{color:var(--warn)}
-.pill.gold{color:var(--good-ink,var(--good))}
-/* skill groups: each skill's name, bar and charts use its group colour */
-.c-combat{--c:var(--c-combat)}.c-gathering{--c:var(--c-gathering)}.c-artisan{--c:var(--c-artisan)}
-.c-support{--c:var(--c-support)}.c-elite{--c:var(--c-elite)}
-td.sk{color:var(--c,var(--ink));font-weight:600}
-.sk-title{color:var(--c)}
-.step .lv{color:var(--c,var(--ink))}
-.legend b{color:var(--c);font-weight:600;margin-right:10px}
-.gains sup{font-size:14px;color:var(--muted);margin-left:2px}
-.status{font-family:var(--f-head)}
-.mark{display:inline-flex;align-items:center;gap:8px}
-.mark svg{width:24px;height:24px;flex:none;display:block}
-.meta .pill{font:inherit;letter-spacing:0;text-transform:none}
-td input{width:96px;padding:2px 6px;text-align:right}
-.method{display:inline-block;max-width:250px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
-
-/* charts */
-.charts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:20px;align-items:start}
-.charts .panel{padding:14px 16px 16px;display:grid;gap:14px}
-.chart-block{display:grid;gap:6px}
-.chart-block h3{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline}
-.chart-block h3 small{font:400 13px var(--f-ui);color:var(--muted)}
-.key{display:inline-flex;align-items:center;gap:6px;font:400 13px var(--f-ui);color:var(--muted)}
-.key i{width:10px;height:10px;display:inline-block}
-.charts .panel > *,.chart-block > *{min-width:0}
-.canvas-box{position:relative;height:270px;width:100%;min-width:0;overflow:hidden}
-.canvas-box.tall{height:auto}
-
-/* training */
-.boosts{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;padding:10px 0 14px;font-size:14px}
-.boosts > span{font-family:var(--f-head);font-weight:600;color:var(--muted)}
-.boosts label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
-.boosts select{padding:2px 6px}
-.kit{flex-basis:100%}
-.kit summary{cursor:pointer;font-family:var(--f-head);font-weight:600;width:max-content}
-.kit-tools{display:flex;gap:8px;margin:10px 0 8px}
-.kit-tools button{font-size:13px;padding:2px 8px}
-.kit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px 22px;background:var(--panel);padding:12px 14px}
-.kit-row{display:grid;gap:2px;padding:4px 0;border-bottom:1px solid var(--grid)}
-.kit-row .sk-name{color:var(--c);font-weight:600}
-.kit-row label{font-size:13.5px}
-.routes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
-.route{background:var(--panel);padding:14px 16px;display:grid;gap:8px;align-content:start;min-width:0}
-.route h3{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline}
-.route h3 small{font:400 13px var(--f-ui);color:var(--muted)}
-.route-sum th,.route-sum td{padding:5px 0;white-space:normal;vertical-align:top}
-.route-sum td:nth-child(2){padding-left:10px}
-.route-sum .method{display:inline;max-width:none;white-space:normal}
-.route-sum td.r{white-space:nowrap}
-.route-sum td.r,.route-sum th.r{padding-left:12px}
-.step{display:grid;grid-template-columns:100px minmax(0,1fr) auto;gap:2px 12px;align-items:baseline;padding:8px 0;border-top:1px solid var(--grid)}
-.step .lv{font:600 15px var(--f-head)}
-.step .what{display:grid;gap:2px;min-width:0}
-.step .what span:first-child{overflow-wrap:anywhere}
-.step .meta{font-size:13px;color:var(--muted)}
-.step .h{font:600 15px var(--f-head);text-align:right}
-.tag{font-size:12px;color:var(--muted);font-style:italic;white-space:nowrap}
-.tag.warn{color:var(--warn)}
-.others{margin-top:6px;padding:10px 12px 12px;background:var(--bg);display:grid;gap:8px}
-.others h4{margin:0;font:600 13px var(--f-head);color:var(--muted);letter-spacing:.02em}
-.others ul{list-style:none;margin:0;padding:0;display:grid;gap:9px}
-.others li{display:grid;gap:1px}
-.o-name{color:var(--ink);font-weight:600;font-size:14px}
-.o-lvl{color:var(--muted);font-weight:400;font-size:12.5px;margin-left:6px}
-.o-note{color:var(--muted);font-size:13px;line-height:1.4}
-.routes .hint{margin:0;font-size:13px;color:var(--muted)}
-
-/* lower three */
-.lower{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:start}
-.lower .panel{padding:12px 14px}
-.lower h2{margin-bottom:8px}
-.lower td,.lower th{padding:5px 6px}
-.lower td:first-child,.lower th:first-child{padding-left:0;white-space:normal}
-.lower td:last-child,.lower th:last-child{padding-right:0}
-.list{list-style:none;margin:0;padding:0}
-.list li.more{border-bottom:0;padding-top:8px}
-.more button{border:0;padding:0;color:var(--accent);font:500 14px var(--f-ui);text-decoration:underline;text-underline-offset:3px}
-.list li{padding:7px 0;border-bottom:1px solid var(--grid);display:grid;gap:2px}
-.list li:last-child{border-bottom:0}
-.list .row{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-.list time,.list .meta{font-size:12.5px;color:var(--muted)}
-.empty{padding:16px 0;color:var(--muted)}
-.qp{display:grid;gap:8px;padding-bottom:10px}
-.qp .big{font:600 30px/1 var(--f-head)}
-.qp .bar{width:100%}
-.chips{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13.5px;color:var(--muted)}
-.tabs{display:flex;gap:4px 14px;flex-wrap:wrap;padding:4px 0 6px;border-bottom:1px solid var(--line)}
-.tabs button{border:0;padding:2px 0;font-size:14px;color:var(--muted);border-bottom:2px solid transparent;border-radius:0}
-.tabs button[aria-pressed="true"]{color:var(--ink);border-bottom-color:var(--accent)}
-
-footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
-
-@media (max-width:1050px){.charts,.lower{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:800px){.routes{grid-template-columns:minmax(0,1fr)} #player{font-size:32px}}
-@media (prefers-reduced-motion:no-preference){.bar i{transition:width .3s}}
-</style>
-</head>
-<body>
-<div class="topbar"><div class="topbar-in">
-  <span class="mark"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" viewBox="0 0 96 96"> <rect width="96" height="96" rx="14" fill="#1f6b63"/> <rect x="7" y="7" width="82" height="82" rx="9" fill="none" stroke="#e4b84f" stroke-width="3"/> <text x="48" y="61" font-family="Bahnschrift, 'Arial Narrow', Arial, sans-serif" font-weight="700" font-size="40" fill="#e4b84f" text-anchor="middle">99</text> <rect x="22" y="70" width="52" height="5" fill="#0f3d38"/> <rect x="22" y="70" width="38" height="5" fill="#e4b84f"/> </svg><span>rs3 xp planner</span></span>
-  <span class="status" id="status"></span>
-  <button id="theme" type="button" title="Switch theme">theme: auto</button>
-  <span class="actions">
-    <button id="refresh">update</button>
-    <form class="add" id="add-form">
-      <input id="add-name" placeholder="add rsn" maxlength="12" aria-label="Display name to track">
-      <button type="submit">track</button>
-    </form>
-  </span>
-</div></div>
-
-<main class="wrap">
-  <div id="notice" hidden></div>
-
-  <header class="sheet">
-    <div>
-      <select id="player" aria-label="Player"></select>
-      <p class="totals" id="totals"></p>
-    </div>
-    <dl class="gains" id="kpis"></dl>
-  </header>
-
-  <nav class="toolbar" aria-label="Plan settings">
-    <div class="ctl"><span>Goal</span><div class="seg" id="seg-target"></div></div>
-    <div class="ctl"><span>Pace</span>
-      <select id="pace" aria-label="Pace used for finish dates">
-        <optgroup label="Your recent pace">
-          <option value="7">Last 7 days</option><option value="30">Last 30 days</option>
-          <option value="90">Last 90 days</option><option value="365">Last year</option>
-        </optgroup>
-        <optgroup label="Training methods">
-          <option value="fastest">Fastest methods</option><option value="easiest">Easiest methods</option>
-        </optgroup>
-        <optgroup label="Your own rate">
-          <option value="manual">XP/hr I enter</option>
-        </optgroup>
-      </select>
-    </div>
-    <div class="ctl" id="hours-ctl" hidden><span>Hours a week</span><input id="hours" type="number" min="0" step="1" style="width:70px"></div>
-    <div class="ctl"><span>Gains</span><div class="seg" id="seg-period"></div></div>
-  </nav>
-
-  <section class="skills">
-    <div class="sec-head"><h2>Skills</h2><p id="goal"></p></div>
-    <div class="panel scroll"><table>
-      <thead><tr>
-        <th data-sort="id">Skill</th>
-        <th class="r" data-sort="virtual_level">Level</th>
-        <th class="r" data-sort="xp">XP</th>
-        <th class="r" data-sort="rankSort">Rank</th>
-        <th class="r" data-sort="gain" id="th-gain">Gained</th>
-        <th data-sort="pct" id="th-goal">Progress</th>
-        <th class="r" data-sort="remaining">XP left</th>
-        <th class="r" id="th-pace">XP/day</th>
-        <th class="r" data-sort="eta">ETA</th>
-      </tr></thead>
-      <tbody id="rows"></tbody>
-    </table></div>
-    <p class="foot" id="table-note"></p>
-  </section>
-
-  <section class="charts">
-    <div class="panel">
-      <h3 id="by-skill-title">XP by skill</h3>
-      <div class="canvas-box tall" id="by-skill-box"><canvas id="c-by-skill" aria-label="XP gained per skill"></canvas></div>
-      <p class="empty" id="by-skill-empty" hidden>Nothing gained in this period yet.</p>
-    </div>
-    <div class="panel">
-      <h2 id="skill-title">Overall</h2>
-      <div class="chart-block">
-        <h3><span id="per-title">Per month</span> <span class="key"><i id="key-sofar"></i>so far</span></h3>
-        <div class="canvas-box"><canvas id="c-monthly" aria-label="XP gained per month"></canvas></div>
-      </div>
-      <div class="chart-block">
-        <h3>Total XP <small id="history-note"></small></h3>
-        <div class="canvas-box"><canvas id="c-history" aria-label="Total XP over time"></canvas></div>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <div class="sec-head"><h2 id="route-title">Training route</h2><p>wiki rates as of nov 2026, edit <code>rsxp/methods.json</code> if yours differ</p></div>
-    <div class="boosts" id="boosts">
-      <span>Boosts</span>
-      <label>avatar <select id="b-avatar"><option value="0">none</option><option value="3">3%</option><option value="6">6%</option></select></label>
-      <label><input type="checkbox" id="b-double"> dxp</label>
-      <label><input type="checkbox" id="b-expensive"> Pricey Options</label>
-      <details class="kit"><summary>outfits &amp; portables <span id="kit-count" class="dim"></span></summary>
-        <div class="kit-tools"><button type="button" data-kit-all="outfits">all outfits</button>
-          <button type="button" data-kit-all="portables">all portables</button>
-          <button type="button" data-kit-all="none">clear</button></div>
-        <div class="kit-grid" id="kit"></div>
-      </details>
-    </div>
-    <div class="routes" id="routes"></div>
-  </section>
-
-  <section class="lower">
-    <div class="panel">
-      <h2>Activities</h2>
-      <div class="scroll"><table>
-        <thead><tr><th>Activity</th><th class="r">Score</th><th class="r">Rank</th><th class="r" id="act-gain">Gained</th></tr></thead>
-        <tbody id="activities"></tbody>
-      </table></div>
-    </div>
-    <div class="panel">
-      <h2>Quests <small class="dim" id="quests-checked" style="font:400 13px var(--f-ui)"></small></h2>
-      <div class="qp" id="qp"></div>
-      <div class="tabs" id="quest-tabs"></div>
-      <ul class="list" id="quests"></ul>
-    </div>
-    <div class="panel">
-      <h2>Adventurer's Log</h2>
-      <ul class="list" id="events"></ul>
-    </div>
-  </section>
-
-  <footer>stats: runescape platform api &nbsp;·&nbsp; rates: rs wiki &nbsp;·&nbsp; not affiliated with jagex</footer>
-</main>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script>
 const $ = s => document.querySelector(s);
 const TARGETS = ["99", "120", "200m"];
-const WINDOWS = [[7, "7 days"], [30, "30 days"], [90, "90 days"], [365, "1 year"],
-  ["fastest", "Fastest methods"], ["easiest", "Easiest methods"], ["manual", "Manual"]];
 const MODES = ["fastest", "easiest"];
 const EFFORT = { afk: ["afk", "info"], low: ["low effort", ""], high: ["click-heavy", "warn"] };
 const isMethods = () => MODES.includes(state.window);
@@ -458,6 +120,7 @@ async function staticApi(path, opts) {
   const u = new URL(path, "http://demo"), p = u.pathname, q = u.searchParams;
   if (p === "/api/players") return staticJson("players");
   if (p === "/api/training/boosts") return (await staticJson("boosts")).boosts;
+  if (p === "/api/training/creatures") return staticJson("creatures");
   if (p.endsWith("/summary")) return staticJson(`summary-${q.get("window")}`);
   if (/\/skills\/\d+$/.test(p)) return staticJson(`skill-${p.split("/").pop()}`);
   if (p.endsWith("/training")) {
@@ -543,6 +206,16 @@ function renderTable() {
     </tr>`;
   }).join("");
   renderGoal(rows);
+  renderNext(rows);
+}
+// The skills nearest the goal, to fill the space under the by-skill chart.
+function renderNext(rows) {
+  const near = rows.filter(r => r.t && r.t.remaining > 0).sort((a, b) => a.t.remaining - b.t.remaining).slice(0, 6);
+  $("#next-title").textContent = `Closest to ${state.target}`;
+  $("#next").innerHTML = near.length ? near.map(r => `<li class="c-${CATEGORY[r.name] || "support"}" data-id="${r.id}">
+      <span class="sk-name">${esc(r.name)}</span><span class="bar"><i style="width:${r.t.pct}%"></i></span>
+      <span class="num">${short(r.t.remaining)}</span><span class="num dim" title="${etaDate(r.eta)}">${eta(r.eta)}</span></li>`).join("")
+    : `<li class="empty">Every skill is at ${state.target}.</li>`;
 }
 function renderGoal(rows) {
   const open = rows.filter(r => r.t && r.t.remaining > 0);
@@ -805,17 +478,39 @@ function renderRoutes() {
           ${g.note ? `<span class="meta">${esc(g.note)}</span>` : ""}</span>
         <span class="h">${hrs(g.hours)}</span></div>`;
     }).join("");
-    const unrated = (s.other_methods || []).filter(o => !o.xp_hr);
-    const pricey = (s.other_methods || []).filter(o => o.xp_hr);
+    const pricey = (s.other_methods || []).filter(o => o.xp_hr && o.expensive && !o.locked);
+    const unrated = (s.other_methods || []).filter(o => !pricey.includes(o));
     const rates = pricey.map(o => o.xp_hr);
-    const others = unrated.map(o => `<li><span class="o-name">${esc(o.name)}<span class="o-lvl">lvl ${o.level}</span></span>
-      <span class="o-note">${esc(o.note || "no published hourly rate")}</span></li>`).join("")
+    const others = unrated.map(o => `<li><span class="o-name">${esc(o.name)}<span class="o-lvl">lvl ${o.level}${o.slayer ? `, ${o.slayer} Slayer` : ""}</span></span>
+      <span class="o-note">${esc(o.locked || o.note || "no published hourly rate")}</span></li>`).join("")
       + (pricey.length ? `<li><span class="o-name">Pricey Options<span class="o-lvl">${pricey.length} method${pricey.length > 1 ? "s" : ""}</span></span>
       <span class="o-note">${pricey.map(o => esc(o.name)).join(", ")} (${short(Math.min(...rates))}${pricey.length > 1 ? `–${short(Math.max(...rates))}` : ""} xp/hr). Tick Pricey Options above to include ${pricey.length > 1 ? "them" : "it"}.</span></li>` : "");
     return `<div class="route"><h3>${label[m]} <small>${hrs(s.hours)}${week(s.hours)}</small></h3>${steps ||
       `<p class="empty">No method in methods.json for level ${s.missing_method_at}.</p>`}
       ${others ? `<div class="others"><h4>Other options, not in the hours above</h4><ul>${others}</ul></div>` : ""}</div>`;
+  }).join("") + creaturePick(sid, name);
+}
+// Combat skills: pick a creature and how many you kill an hour; XP/hr = kills x XP per kill x boosts.
+function creaturePick(sid, name) {
+  const cr = state.creatures, s = state.training.fastest?.skills.find(x => x.id === sid);
+  if (!cr || !cr.skills.includes(name) || !s || !s.remaining) return "";
+  const slayer = state.data.skills.find(x => x.name === "Slayer")?.level ?? 1;
+  const share = name === "Hitpoints" ? 1 / 3 : 1;   // Constitution gets about a third of combat XP
+  const pick = store.get("pick." + name, {});
+  const c = cr.list.find(x => x.name === pick.name && !(x.slayer > slayer));
+  const kills = Number(pick.kills) || 0;
+  const rate = c && kills ? c.kill * share * kills * s.multiplier : 0;
+  const h = rate ? s.remaining / rate : null;
+  const opts = cr.list.map(x => {
+    const why = x.slayer > slayer ? `, needs ${x.slayer} Slayer` : "";
+    return `<option value="${esc(x.name)}" ${why ? "disabled" : ""} ${c === x ? "selected" : ""}>${esc(x.name)} (${nf.format(Math.round(x.kill * share))} XP/kill${why})</option>`;
   }).join("");
+  return `<div class="route pick"><h3>Your pick <small>a creature you choose, at your kill rate</small></h3>
+    <div class="pick-row" data-skill="${esc(name)}"><select id="pick-creature" aria-label="Creature"><option value="">Choose a creature…</option>${opts}</select>
+      <label><input id="pick-kills" type="number" min="0" step="1" value="${kills || ""}" placeholder="kills"> kills an hour</label></div>
+    ${c && (c.requires || c.slayer) ? `<span class="meta">Needs ${esc([c.slayer && `${c.slayer} Slayer`, c.requires].filter(Boolean).join(", "))}</span>` : ""}
+    ${rate ? `<p class="pick-out"><b>${short(rate)}</b> XP/hr${s.multiplier !== 1 ? ` (with boosts)` : ""}, so <b>${hrs(h)}</b> to ${state.target}${hours() > 0 ? `, or ${eta(h / hours() * 7)} at ${hours()} h a week` : ""}</p>`
+      : `<p class="dim">Choose a creature and enter how many you kill an hour.</p>`}</div>`;
 }
 
 // ---------- activities, quests, events ----------
@@ -970,6 +665,12 @@ $("#boosts").addEventListener("click", e => {
   });
   $("#boosts").dispatchEvent(new Event("change"));
 });
+$("#next").onclick = e => { const li = e.target.closest("li[data-id]"); if (li) loadSkill(Number(li.dataset.id)).catch(err => notice(err.message, true)); };
+$("#routes").addEventListener("change", e => {
+  const row = e.target.closest(".pick-row"); if (!row) return;
+  store.set("pick." + row.dataset.skill, { name: $("#pick-creature").value, kills: Number($("#pick-kills").value) || 0 });
+  renderRoutes();
+});
 $("#quest-tabs").onclick = e => { const b = e.target.closest("button"); if (b) { state.questTab = b.dataset.tab; state.openLists.quests = false; renderQuests(); } };
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-more]"); if (!b) return;
@@ -1040,6 +741,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
   renderControls();
   renderBoostControls();
   renderKit().catch(e => notice(e.message, true));
+  api("/api/training/creatures").then(c => { state.creatures = c; if (state.data) renderRoutes(); }).catch(e => notice(e.message, true));
   try {
     const want = decodeURIComponent(location.hash.slice(1)).toLowerCase();
     if (want) state.skill = Math.max(0, ["overall","attack","defence","strength","hitpoints","ranged","prayer","magic",
@@ -1050,6 +752,3 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
   } catch (e) { notice(e.message, true); }
   if (!STATIC) setInterval(() => state.pid && loadSummary().then(loadExtras).catch(() => {}), 5 * 60 * 1000);
 })();
-</script>
-</body>
-</html>

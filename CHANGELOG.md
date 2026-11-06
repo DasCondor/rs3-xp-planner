@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+- "Your pick" for combat skills: choose from 21 creatures (combat XP per kill from the wiki;
+  Slayer locks applied) and enter your kills per hour, to get XP/hr, hours and weeks to the goal.
+  Hitpoints gets about a third. The creatures live in one shared table in `methods.json`, which
+  replaces 17 scattered per-kill rows.
+- A "Closest to 120" panel (it follows the chosen goal) under the by-skill chart lists the six
+  skills nearest the goal, with XP left and ETA. Click one to open it.
+- Ravenous strigoi: Ranged 247,680 XP/hr and Slayer 218,352 XP/hr at 4 kills per 5 minutes,
+  needing 104 Slayer.
+- The server sends `Cache-Control: no-cache` for the page and its files, so an update is never
+  run against a stale cached `app.js`.
+- Slayer creatures as combat training options: corrupted scorpions, abyssal demons, gargoyles,
+  abyssal beasts, and abyssal savages, beasts and armoured phantoms for Necromancy. They only
+  count once your Slayer level is high enough; otherwise they're listed with what's missing.
+  Also new Ranged rates: the Abyss with red chinchompas (702k/hr) and tunnel waterfiends.
+- `methods.json` uses compact rows (`[level, name, xp/hr, effort, {extras}]`), about 30% smaller.
+  Dead code is removed.
+- The dashboard is split into `index.html`, `app.css`, `app.js`, `theme.js` and `logo.svg`, with
+  nothing inlined. This also fixes the browser-tab icon, whose inline data URI was broken.
+- The demo site is no longer committed. `demo/fixture.json` holds the raw data (one file,
+  about 35 KB), and a GitHub Actions workflow builds and deploys the site on each push. This
+  replaces the generated `docs/` folder (an HTML copy plus 51 JSON files).
+- The Docker image uses Python 3.15, and CI tests on 3.10 and 3.15.
+- README screenshots moved to `assets/`. New commands: `demo-fixture` and `build-demo` (they
+  replace `export-demo`).
 - The "99" logo is shown in the top bar and used as the browser-tab icon.
 - Up to a year of history again. Monthly totals saved from RuneMetrics before it closed are
   read from your local database (nothing is fetched). They join hourly Hiscores snapshots

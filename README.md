@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/logo.svg" width="88" alt="">
+<img src="rsxp/static/logo.svg" width="88" alt="">
 
 # rs3-xp-planner
 
@@ -19,8 +19,8 @@
 <br>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark.png">
-  <img alt="The skill sheet: name, total level and XP, gains today/this week/this month/this year, then every skill with level, XP, rank, progress bar to 120, the method to train it with and an ETA" src="docs/screenshots/dashboard-light.png" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/dashboard-dark.png">
+  <img alt="The skill sheet: name, total level and XP, gains today/this week/this month/this year, then every skill with level, XP, rank, progress bar to 120, the method to train it with and an ETA" src="assets/screenshots/dashboard-light.png" width="100%">
 </picture>
 
 </div>
@@ -61,7 +61,9 @@ Invention uses its elite XP curve.
 **Training routes**<br>
 Level by level, the fastest or the most AFK method and how many hours each stretch
 takes. Rates come from the RS Wiki training guides as of November 2026, including
-Colossi Divination and Fenmoor Totems.
+Colossi Divination and Fenmoor Totems. Slayer creatures count for combat
+XP once your Slayer level allows them, and for combat skills you can pick any of 21
+creatures and enter your own kills per hour.
 
 </td>
 <td valign="top">
@@ -92,13 +94,13 @@ history in a volume. It has light and dark themes and works on a phone.
 </table>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/charts-dark.png">
-  <img alt="XP gained this week by skill, coloured by skill group, next to per-day gains and a total XP line for Woodcutting" src="docs/screenshots/charts-light.png" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/charts-dark.png">
+  <img alt="XP gained this week by skill, coloured by skill group, next to per-day gains and a total XP line for Woodcutting" src="assets/screenshots/charts-light.png" width="100%">
 </picture>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/training-dark.png">
-  <img alt="Training to 120: hours per skill with the fastest and the easiest methods side by side, plus boost toggles" src="docs/screenshots/training-light.png" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/training-dark.png">
+  <img alt="Training to 120: hours per skill with the fastest and the easiest methods side by side, plus boost toggles" src="assets/screenshots/training-light.png" width="100%">
 </picture>
 
 ## Quick start
@@ -206,7 +208,8 @@ python -m rsxp serve [--port 8765]         dashboard + hourly collector
 python -m rsxp add "Name"                  track a player
 python -m rsxp poll ["Name"]               check Hiscores now
 python -m rsxp plan "Name" --target 120    print the plan in the terminal
-python -m rsxp export-demo "Name"          rebuild docs/ (shown as "Demo Player")
+python -m rsxp demo-fixture "Name"         refresh demo/fixture.json (shown as "Demo Player")
+python -m rsxp build-demo                  build the demo site into _site/ (CI does this)
 ```
 
 With Docker, put `docker compose exec planner` in front, for example
@@ -246,8 +249,9 @@ Everything goes through one client ([`rsxp/client.py`](rsxp/client.py)):
 | `rsxp/training.py` | Training routes and boosts |
 | `rsxp/methods.json` | Methods, rates, outfits and portables |
 | `rsxp/server.py` | Local API |
-| `rsxp/static/index.html` | Dashboard, a single file |
-| `rsxp/demo.py` | Builds the static demo in `docs/` |
+| `rsxp/static/` | The dashboard: `index.html`, `app.css`, `app.js`, `theme.js`, `logo.svg` |
+| `rsxp/demo.py` | Demo fixture and static site builder |
+| `demo/fixture.json` | The demo's raw data, one file. The site is built from it in CI and never committed |
 
 </details>
 

@@ -20,7 +20,9 @@ marks.ini
 # Local planning notes
 /design/
 
-page.js
 
 # Per-machine Docker tweaks
 docker-compose.override.yml
+
+# Demo site output (built in CI from demo/fixture.json)
+_site/
