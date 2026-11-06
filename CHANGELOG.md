@@ -2,49 +2,56 @@
 
 ## Unreleased
 
-- Levels stop at 120, as in game. They used to count on to 126 for XP past 120, so skills
-  like Hitpoints and Necromancy could show more than 120.
-- New players get a year of history automatically: the first time a name is tracked, the
-  collector fetches its monthly XP from RuneMetrics once, at the usual polite pace. RuneMetrics
-  closes on 10 Nov 2026; after that the step is skipped and history builds from hourly snapshots.
-  A private RuneMetrics profile is detected first: the page says so, and it's asked again hourly
-  until the profile is made public.
-- "Players" table when you track two or more names: total level, total XP on a bar scaled to the
-  group's range, this week's gain, skills at the goal, XP to go, and training time with the same
-  goal, pace and boosts applied to everyone. Pick a skill to compare it across players; click a row
-  to switch to that player.
-- The demo shows two players, "Demo Player 1" and "Demo Player 2", so the Players table is
-  visible there. `demo-fixture` takes several names; the fixture format is now version 2.
-- "Your pick" for combat skills: choose from 21 creatures (combat XP per kill from the wiki;
-  Slayer locks applied) and enter your kills per hour, to get XP/hr, hours and weeks to the goal.
-  Hitpoints gets about a third. The creatures live in one shared table in `methods.json`, which
-  replaces 17 scattered per-kill rows.
-- A "Closest to 120" panel (it follows the chosen goal) under the by-skill chart lists the six
-  skills nearest the goal, with XP left and ETA. Click one to open it.
-- Ravenous strigoi: Ranged 247,680 XP/hr and Slayer 218,352 XP/hr at 4 kills per 5 minutes,
-  needing 104 Slayer.
-- The server sends `Cache-Control: no-cache` for the page and its files, so an update is never
-  run against a stale cached `app.js`.
-- Slayer creatures as combat training options: corrupted scorpions, abyssal demons, gargoyles,
-  abyssal beasts, and abyssal savages, beasts and armoured phantoms for Necromancy. They only
-  count once your Slayer level is high enough; otherwise they're listed with what's missing.
-  Also new Ranged rates: the Abyss with red chinchompas (702k/hr) and tunnel waterfiends.
-- `methods.json` uses compact rows (`[level, name, xp/hr, effort, {extras}]`), about 30% smaller.
-  Dead code is removed.
-- The dashboard is split into `index.html`, `app.css`, `app.js`, `theme.js` and `logo.svg`, with
-  nothing inlined. This also fixes the browser-tab icon, whose inline data URI was broken.
-- The demo site is no longer committed. `demo/fixture.json` holds the raw data (one file,
-  about 35 KB), and a GitHub Actions workflow builds and deploys the site on each push. This
-  replaces the generated `docs/` folder (an HTML copy plus 51 JSON files).
-- The Docker image uses Python 3.15, and CI tests on 3.10 and 3.15.
-- README screenshots moved to `assets/`. New commands: `demo-fixture` and `build-demo` (they
-  replace `export-demo`).
-- The "99" logo is shown in the top bar and used as the browser-tab icon.
-- Up to a year of history again. Monthly totals saved from RuneMetrics before it closed are
-  read from your local database (nothing is fetched). They join hourly Hiscores snapshots
-  and Adventurer's Log milestones.
-- `.gitattributes` keeps line endings consistent. `docker-compose.override.yml` is
-  gitignored for per-machine tweaks, like mounting an existing `./data` folder.
+Security pass:
+
+- The local server only answers to `127.0.0.1` / `localhost` (plus anything in `RSXP_HOSTS`),
+  and refuses changes from other websites. Before this, a web page you visited could in theory
+  reach it through your browser (DNS rebinding) or make it hit Jagex for you.
+- The page sends no-framing / no-sniffing / no-referrer headers and has a content security
+  policy: no inline scripts or `onerror=` style handlers, and nothing from other sites except
+  the one Chart.js file, which is pinned with an integrity hash so a tampered copy won't run.
+  The demo's settings moved from an inline script to `config.js` to fit the policy.
+- Numbers and text from Jagex are checked as they come in. Junk where a number should be is
+  dropped instead of stored.
+- If Jagex sends something the code can't read, that player waits the normal hour instead of
+  being asked again every minute. Same for the history import. Answers over 2 MB are refused.
+- At most 25 tracked names by default (`RSXP_MAX_PLAYERS`). `/docs` is gone.
+- Docker: read-only filesystem, all capabilities dropped, no privilege escalation, memory and
+  process limits. Dependencies and GitHub Actions are pinned to exact versions, and the tests
+  workflow gets a read-only token.
+
+Also:
+
+- Levels stop at 120 like in game. Hitpoints, Necromancy and a few others were showing up to 126.
+- New players get a year of history: the first time a name is tracked, it pulls their monthly
+  XP from RuneMetrics once (until RuneMetrics shuts on 10 Nov 2026). If their profile is
+  private the page tells you, and it checks again every hour.
+- A Players table shows up once you track two or more names. Same goal, pace and boosts for
+  everyone, so you can see who's closer. Click a skill to compare just that one, or a row to
+  switch player.
+- The demo has two players now, Demo Player 1 and 2.
+- The player dropdown was unreadable in dark mode. Fixed.
+- Combat skills get a "Your pick" box: choose one of 21 creatures, type how many you kill an
+  hour, and it works out XP/hr and how long you've got left. Hitpoints gets about a third.
+- "Closest to 120" (or whatever goal you've picked) sits under the by-skill chart: the six
+  skills nearest the goal. Click one to open it.
+- Ravenous strigoi for Ranged (247,680/hr) and Slayer (218,352/hr), at 4 kills per 5 minutes.
+  Needs 104 Slayer.
+- Slayer creatures count as combat training once your Slayer level is high enough: corrupted
+  scorpions, abyssal demons, gargoyles, abyssal beasts, and savages, beasts and armoured
+  phantoms for Necromancy. Until then they're listed with what you're missing. Also red chins
+  in the Abyss (702k/hr) and tunnel waterfiends for Ranged.
+- `methods.json` is about 30% smaller (one short row per method). Some dead code removed.
+- The page is split into `index.html`, `app.css`, `app.js`, `theme.js` and `logo.svg`. That
+  also fixed the tab icon. Files are sent with `no-cache` so an update never runs old JS.
+- The demo isn't committed any more. GitHub builds it from `demo/fixture.json` on every push,
+  which got rid of the `docs/` folder and its 51 JSON files.
+- Docker runs Python 3.15. Tests run on 3.10 and 3.15.
+- The "99" logo is in the top bar and the browser tab.
+- Up to a year of history again, from monthly totals saved before RuneMetrics closed.
+- Screenshots moved to `assets/`. `demo-fixture` and `build-demo` replace `export-demo`.
+  Line endings are pinned with `.gitattributes`, and `docker-compose.override.yml` is ignored
+  for your own local tweaks.
 
 ## v0.2.0 (November 2026)
 

@@ -138,10 +138,13 @@ def build_site(conn, out: Path, repo: str | None = "auto", now: int | None = Non
 
     for name in ASSETS:
         shutil.copyfile(STATIC / name, out / name)
-    config = json.dumps({"base": "data/", "repo": repo})
+    # a file, not an inline <script>: the page's CSP only runs scripts from files
+    repo = None if repo in (None, "", "none") else repo
+    (out / "config.js").write_text(f"window.RSXP_STATIC = {json.dumps({'base': 'data/', 'repo': repo})};\n",
+                                   encoding="utf-8")
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     if "</title>" not in html:
         raise SystemExit("static/index.html has no <title>; can't inject the demo config")
-    html = html.replace("</title>", f" (demo)</title>\n<script>window.RSXP_STATIC = {config};</script>", 1)
+    html = html.replace("</title>", ' (demo)</title>\n<script src="config.js"></script>', 1)
     (out / "index.html").write_text(html, encoding="utf-8")
     return files

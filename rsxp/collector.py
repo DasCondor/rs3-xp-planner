@@ -92,11 +92,24 @@ def run_due(conn, now: int | None = None) -> int:
     due = conn.execute("SELECT * FROM players WHERE next_check_at <= ? ORDER BY next_check_at",
                        (now,)).fetchall()
     for p in due:
-        poll(conn, p)
+        try:
+            poll(conn, p)
+        except Exception:
+            # An answer we can't read must not mean asking again every minute: wait the normal hour.
+            conn.rollback()
+            log.exception("poll failed for %s", p["display_name"])
+            conn.execute("UPDATE players SET next_check_at=? WHERE id=?", (now + POLL_S, p["id"]))
+            conn.commit()
     new = conn.execute("SELECT * FROM players WHERE status='ok' AND (history_at IS NULL OR "
-                       "(history_error='private' AND history_at < ?)) LIMIT 1", (now - POLL_S,)).fetchone()
+                       "(history_error IS NOT NULL AND history_at < ?)) LIMIT 1", (now - POLL_S,)).fetchone()
     if new:
-        pull_history(conn, new, now)
+        try:
+            pull_history(conn, new, now)
+        except Exception:
+            conn.rollback()
+            log.exception("history import failed for %s", new["display_name"])
+            conn.execute("UPDATE players SET history_at=?, history_error='failed' WHERE id=?", (now, new["id"]))
+            conn.commit()
     return len(due)
 
 

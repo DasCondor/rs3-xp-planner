@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .xp import SKILL_IDS
+from .xp import SKILL_IDS, SKILLS
 
 DEFAULT_DB = Path(__file__).resolve().parent.parent / "data" / "rsxp.sqlite3"
 
@@ -75,6 +75,16 @@ CREATE TABLE IF NOT EXISTS events(
 NAME_RE = re.compile(r"^[A-Za-z0-9 _-]{1,12}$")
 
 
+def _int(v) -> int | None:
+    """Numbers from the API, checked: anything that isn't a whole number is stored as NULL,
+    so a malformed answer can never put text where the page expects a number."""
+    return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+
+def _text(v, limit: int = 500) -> str:
+    return str(v)[:limit] if v is not None else ""
+
+
 def connect(path: Path | str = DEFAULT_DB) -> sqlite3.Connection:
     if str(path) != ":memory:":
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -122,7 +132,11 @@ def save_hiscores(conn, pid: int, data: dict, now: int | None = None) -> bool:
     """Store an Index Lite response. Returns True if XP changed (new snapshot row)."""
     now = now or int(time.time())
     save_activities(conn, pid, data.get("activities", []), now)
-    skills = {s["id"]: s for s in data["skills"]}
+    skills = {s["id"]: {"xp": s["xp"], "level": _int(s.get("level")), "rank": _int(s.get("rank"))}
+              for s in data["skills"]
+              if _int(s.get("id")) is not None and 0 <= s["id"] < len(SKILLS) and _int(s.get("xp")) is not None}
+    if not skills:
+        raise ValueError("Hiscores answer has no skills")
     latest = conn.execute(
         "SELECT id FROM snapshots WHERE player_id=? AND source='hiscores' "
         "ORDER BY taken_at DESC, id DESC LIMIT 1", (pid,)).fetchone()
@@ -149,8 +163,9 @@ def save_activities(conn, pid: int, activities: list[dict], now: int) -> None:
         "WHERE player_id=? GROUP BY name) m ON a.name=m.name AND a.taken_at=m.t WHERE a.player_id=?",
         (pid, pid))}
     for a in activities:
-        if a["score"] < 0:          # -1 = no data for this record
-            continue
+        if _int(a.get("score")) is None or a["score"] < 0 or not isinstance(a.get("name"), str):
+            continue                # -1 = no data for this record
+        a = {"name": _text(a["name"], 100), "score": a["score"], "rank": _int(a.get("rank"))}
         old = latest.get(a["name"])
         if old and old["score"] == a["score"]:
             if old["rank"] != a["rank"]:
@@ -194,9 +209,9 @@ def save_quests(conn, pid: int, data: dict, now: int | None = None) -> None:
                 (prev is None or prev["status"] != "COMPLETED"):
             seen = now
         conn.execute("INSERT OR REPLACE INTO quests VALUES (?,?,?,?,?,?,?,?,?)",
-                     (pid, qid, q["title"], q.get("difficulty"), int(bool(q.get("members"))),
-                      q.get("qp"), int(bool(q.get("eligible"))), q["status"], seen))
-    conn.execute("UPDATE players SET qp=?, qp_max=? WHERE id=?", (data.get("qp"), data.get("qp_max"), pid))
+                     (pid, qid, _text(q["title"], 200), _int(q.get("difficulty")), int(bool(q.get("members"))),
+                      _int(q.get("qp")), int(bool(q.get("eligible"))), _text(q["status"], 20), seen))
+    conn.execute("UPDATE players SET qp=?, qp_max=? WHERE id=?", (_int(data.get("qp")), _int(data.get("qp_max")), pid))
     conn.commit()
 
 
@@ -227,7 +242,7 @@ def save_events(conn, pid: int, data: dict) -> int:
     rows = []
     for e in data.get("events", []):
         ts = int(datetime.fromisoformat(e["date"].replace("Z", "+00:00")).timestamp())
-        rows.append((pid, ts, e.get("type", ""), e.get("text", ""), e.get("details", "")))
+        rows.append((pid, ts, _text(e.get("type"), 100), _text(e.get("text")), _text(e.get("details"), 1000)))
     cur = conn.executemany(
         "INSERT OR IGNORE INTO events(player_id, date, type, text, details) VALUES (?,?,?,?,?)", rows)
     conn.commit()

@@ -5,10 +5,11 @@ import threading
 import time
 from contextlib import asynccontextmanager, closing
 from pathlib import Path
+from urllib.parse import urlsplit
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, PlainTextResponse
+from pydantic import BaseModel, Field
 
 from . import collector, db, gains, planner, training
 from .xp import SKILLS, TARGETS
@@ -17,10 +18,23 @@ STATIC = Path(__file__).resolve().parent / "static"
 STATIC_ASSETS = {"app.css", "app.js", "theme.js", "logo.svg"}
 # Revalidate every load (cheap, via ETag) so an updated app.js never runs against a stale cache.
 NO_CACHE = {"Cache-Control": "no-cache"}
+# Sent with every response: no framing, no MIME sniffing, no referrer leaks.
+SECURITY_HEADERS = {"X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY",
+                    "Content-Security-Policy": "frame-ancestors 'none'", "Referrer-Policy": "no-referrer"}
+# Names this server answers to. Anything else is refused, which blocks DNS-rebinding attacks
+# (a web page pointing its own domain at 127.0.0.1 to read or drive this API).
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+MAX_PLAYERS = int(os.environ.get("RSXP_MAX_PLAYERS") or 25)   # each one costs Jagex an hourly request
+
+
+def allowed_hosts() -> set[str]:
+    """LOCAL_HOSTS plus RSXP_HOSTS (comma-separated), for opening the page from other devices."""
+    extra = {h.strip().lower().strip("[]") for h in os.environ.get("RSXP_HOSTS", "").split(",") if h.strip()}
+    return LOCAL_HOSTS | extra
 
 
 class NewPlayer(BaseModel):
-    name: str
+    name: str = Field(max_length=40)
 
 
 def seed_players(conn, names: str | None) -> list[str]:
@@ -51,7 +65,21 @@ def create_app(db_path=db.DEFAULT_DB, collect: bool = True) -> FastAPI:
         yield
         stop.set()
 
-    app = FastAPI(title="RS3 XP Planner", lifespan=lifespan)
+    # No /docs or /openapi.json: nothing here needs them, and they'd pull scripts from a CDN.
+    app = FastAPI(title="RS3 XP Planner", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    hosts = allowed_hosts()
+
+    @app.middleware("http")
+    async def guard(request: Request, call_next):
+        host = request.headers.get("host", "")
+        if urlsplit("//" + host).hostname not in hosts:
+            return PlainTextResponse("Unknown host. Add it to RSXP_HOSTS to allow it.", 421)
+        # Changes only from this page: a cross-site form or script can't add players or poll Jagex.
+        if request.method not in ("GET", "HEAD") and request.headers.get("origin") not in (None, f"http://{host}", f"https://{host}"):
+            return PlainTextResponse("Cross-site request refused.", 403)
+        response = await call_next(request)
+        response.headers.update(SECURITY_HEADERS)
+        return response
 
     def open_db():
         return closing(db.connect(db_path))
@@ -81,6 +109,8 @@ def create_app(db_path=db.DEFAULT_DB, collect: bool = True) -> FastAPI:
     @app.post("/api/players")
     def add_player(body: NewPlayer):
         with open_db() as conn:
+            if not db.get_player(conn, body.name) and len(db.players(conn)) >= MAX_PLAYERS:
+                raise HTTPException(409, f"Already tracking {MAX_PLAYERS} players (RSXP_MAX_PLAYERS).")
             try:
                 pid = db.add_player(conn, body.name)
             except ValueError as exc:
@@ -154,7 +184,7 @@ def create_app(db_path=db.DEFAULT_DB, collect: bool = True) -> FastAPI:
         with open_db() as conn:
             player_or_404(conn, pid)
             rows = conn.execute("SELECT date, type, text, details FROM events WHERE player_id=? "
-                                "ORDER BY date DESC LIMIT ?", (pid, min(limit, 200))).fetchall()
+                                "ORDER BY date DESC LIMIT ?", (pid, max(1, min(limit, 200)))).fetchall()
             return [dict(r) for r in rows]
 
     return app

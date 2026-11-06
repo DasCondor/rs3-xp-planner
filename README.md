@@ -193,6 +193,8 @@ type in. You pick which on the page.
 | `RSXP_PLAYERS` | Comma-separated names to track on startup. You can also add them on the page |
 | `RSXP_DB` | Where the SQLite file lives. Docker uses `/data/rsxp.sqlite3` |
 | `RSXP_USER_AGENT` | Replaces the whole User-Agent if you'd rather write your own |
+| `RSXP_HOSTS` | Extra names the page can be opened as, for LAN use. Comma-separated |
+| `RSXP_MAX_PLAYERS` | Most names it'll track (default 25), so it never asks Jagex for too much |
 
 Training rates, outfit and portable bonuses all live in
 [`rsxp/methods.json`](rsxp/methods.json). If your rates differ, edit that file and the
@@ -267,8 +269,11 @@ Recent-pace ETAs need at least a day of history with some XP in it. Switch the p
 **Fastest methods** to get a time from the training rates instead.
 
 **Can I open it on my phone or another PC?**
-The port is bound to `127.0.0.1` because there's no login. If you want it on your LAN,
-change the port line in `docker-compose.yml` to `"8765:8765"`, at your own risk.
+It only listens on `127.0.0.1` because there's no login. For your LAN, change the port
+line in `docker-compose.yml` to `"8765:8765"` and put the name or IP you'll type in the
+address bar into `RSXP_HOSTS` (say `RSXP_HOSTS=192.168.1.20`). Any other name gets
+refused, which is what stops a random website from poking the planner through your
+browser. Anyone on your network can then use it, so only do this at home.
 
 **Ironman?**
 Not yet. Only the main Hiscores are read for now (see the TODO list below).

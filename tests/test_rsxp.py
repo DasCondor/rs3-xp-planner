@@ -403,7 +403,8 @@ def test_demo_fixture_round_trip_and_site(conn, tmp_path):
     assert json.loads((site / "data" / "p2-summary-30.json").read_text())["skills"][1]["xp"] == 2_000
     for asset in ("index.html", "app.css", "app.js", "theme.js", "logo.svg"):
         assert (site / asset).exists(), asset
-    assert "window.RSXP_STATIC" in (site / "index.html").read_text(encoding="utf-8")
+    assert '<script src="config.js">' in (site / "index.html").read_text(encoding="utf-8")
+    assert "window.RSXP_STATIC" in (site / "config.js").read_text(encoding="utf-8")
     for f in site.rglob("*.*"):
         assert "secret" not in f.read_text(encoding="utf-8").lower(), f.name
 
@@ -411,13 +412,105 @@ def test_demo_fixture_round_trip_and_site(conn, tmp_path):
 def test_server_serves_only_page_assets():
     from fastapi.testclient import TestClient
     from rsxp.server import create_app
-    c = TestClient(create_app(":memory:", collect=False))
+    c = TestClient(create_app(":memory:", collect=False), base_url="http://127.0.0.1:8765")
     assert c.get("/").status_code == 200
     for asset in ("", "app.css", "app.js", "theme.js", "logo.svg"):
         r = c.get(f"/{asset}")
         assert r.status_code == 200 and r.headers["cache-control"] == "no-cache", asset
     assert c.get("/server.py").status_code == 404
     assert c.get("/methods.json").status_code == 404
+    # scripts only from this server and the one pinned Chart.js file: no inline code, no other CDN files
+    import re
+    script_src = re.search(r"script-src ([^;]*);", c.get("/").text).group(1).split()
+    assert script_src == ["'self'", "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"]
+
+
+def test_server_refuses_other_hosts_and_cross_site_changes(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from rsxp import server
+    monkeypatch.setattr(collector, "poll", lambda conn, p, *a, **k: "ok")
+    monkeypatch.setattr(server, "MAX_PLAYERS", 2)
+    app = server.create_app(tmp_path / "t.sqlite3", collect=False)
+    local = TestClient(app, base_url="http://127.0.0.1:8765")
+    r = local.get("/api/players")
+    assert r.status_code == 200 and r.headers["x-frame-options"] == "DENY"
+    assert r.headers["x-content-type-options"] == "nosniff"
+    # DNS rebinding: an outside name pointed at this machine
+    assert TestClient(app, base_url="http://evil.example").get("/api/players").status_code == 421
+    # cross-site POST (CSRF) is refused; the page's own origin and tools without Origin are fine
+    assert local.post("/api/players/1/refresh", headers={"Origin": "http://evil.example"}).status_code == 403
+    assert local.post("/api/players", json={"name": "Zezima"},
+                      headers={"Origin": "http://127.0.0.1:8765"}).status_code == 200
+    assert local.post("/api/players", json={"name": "Second"}).status_code == 200
+    assert local.post("/api/players", json={"name": "Third"}).status_code == 409   # cap
+    assert local.post("/api/players", json={"name": "zezima"}).status_code == 200  # already tracked: fine
+    assert local.post("/api/players", json={"name": "x" * 41}).status_code == 422
+    assert local.get("/docs").status_code == 404 and local.get("/openapi.json").status_code == 404
+    monkeypatch.setenv("RSXP_HOSTS", "mypc.lan")
+    lan = TestClient(server.create_app(tmp_path / "t.sqlite3", collect=False), base_url="http://mypc.lan:8765")
+    assert lan.get("/api/players").status_code == 200
+
+
+def test_bad_api_answers_are_stored_safely_and_not_retried_every_minute(conn, monkeypatch):
+    pid = db.add_player(conn, "Test")
+    # junk where numbers belong is dropped, never stored as text
+    db.save_quests(conn, pid, {"qp": "<img src=x onerror=alert(1)>", "qp_max": 5, "quests": {"1": {
+        "title": "<b>Quest</b>", "difficulty": "x", "members": True, "qp": "1; DROP", "eligible": True,
+        "status": "COMPLETED"}}}, now=ts(2026, 11, 4))
+    q = db.quests(conn, pid)
+    assert q["qp"] is None and q["qp_max"] == 5 and q["recent"] == [] and q["total"] == 1
+    assert conn.execute("SELECT qp, difficulty FROM quests").fetchone()[:] == (None, None)
+    payload = hiscores_payload({0: 100, 1: 100})
+    payload["skills"] += [{"id": 999, "xp": 5, "level": 1, "rank": 1}, {"id": 2, "xp": "lots", "level": 1, "rank": 1}]
+    payload["skills"][1]["level"] = "<script>"
+    payload["activities"] = [{"name": "Clues", "score": "9", "rank": 1}, {"name": "RuneScore", "score": 10, "rank": "x"}]
+    db.save_hiscores(conn, pid, payload, now=ts(2026, 11, 4))
+    assert {sid: (r["xp"], r["level"]) for sid, r in db.latest_skills(conn, pid).items()} == {0: (100, 99), 1: (100, None)}
+    assert [(a["name"], a["score"], a["rank"]) for a in db.activities(conn, pid, {})] == [("RuneScore", 10, None)]
+    with pytest.raises(ValueError):
+        db.save_hiscores(conn, pid, {"skills": [{"id": "0", "xp": 1}]}, now=ts(2026, 11, 5))
+
+    # an answer the code can't read: logged, and the player waits the normal hour
+    conn.execute("UPDATE players SET status='ok', next_check_at=0, history_at=1 WHERE id=?", (pid,))
+    conn.commit()
+    calls = []
+    monkeypatch.setattr(client, "hiscores", lambda name: calls.append(name) or {"skills": "nonsense"})
+    now = ts(2026, 11, 6)
+    collector.run_due(conn, now)
+    collector.run_due(conn, now + 60)
+    assert calls == ["Test"] and db.get_player(conn, pid)["next_check_at"] == now + collector.POLL_S
+
+    # same for the history import: one try, then hourly, not every tick
+    conn.execute("UPDATE players SET history_at=NULL WHERE id=?", (pid,))
+    conn.commit()
+    monkeypatch.setattr(client, "profile", lambda name: {})
+    monkeypatch.setattr(client, "xp_monthly", lambda name, skill: calls.append(skill) or
+                        {"monthlyXpGain": [{"totalXp": "x", "monthData": [{"timestamp": 1, "xpGain": None}]}]})
+    collector.run_due(conn, now + 120)
+    collector.run_due(conn, now + 180)
+    assert calls.count(0) == 1 and db.get_player(conn, pid)["history_at"] == now + 120
+    # an error nobody planned for: caught by the collector, marked failed, retried hourly
+    conn.execute("UPDATE players SET history_at=NULL WHERE id=?", (pid,))
+    conn.commit()
+    monkeypatch.setattr(client, "xp_monthly", lambda name, skill: calls.append(skill) or
+                        {"monthlyXpGain": [{"totalXp": "x", "monthData": [{"timestamp": 1000, "xpGain": 1}]}]})
+    collector.run_due(conn, now + 240)
+    collector.run_due(conn, now + 300)
+    assert calls.count(0) == 2 and db.get_player(conn, pid)["history_error"] == "failed"
+    collector.run_due(conn, now + 240 + collector.POLL_S + 1)
+    assert calls.count(0) == 3
+
+
+def test_client_refuses_oversized_answers(monkeypatch):
+    big = io.BytesIO(b"[" + b"0," * client.MAX_BODY + b"0]")
+    class Resp:
+        def __enter__(self): return big
+        def __exit__(self, *a): return False
+    monkeypatch.setattr(client._opener, "open", lambda req, timeout: Resp())
+    monkeypatch.setattr(client, "_last_call", 0.0)
+    monkeypatch.setattr(client, "_paused_until", 0.0)
+    with pytest.raises(client.Unavailable, match="over"):
+        client.get_json("https://example.invalid/")
 
 
 # --- docker / env settings ------------------------------------------------------

@@ -185,7 +185,7 @@ function renderTable() {
     + '<b class="c-artisan">artisan</b><b class="c-support">support</b><b class="c-elite">elite</b></span>'
     + ' &nbsp;·&nbsp; gold bar = there &nbsp;·&nbsp; (99) = real level, hiscores cap it'
     + (usesHours() ? ` &nbsp;·&nbsp; eta = all ${hours()} h/wk on that one skill` : "")
-    + (d.estimated[state.period] ? " &nbsp;·&nbsp; * before tracking started: from imported monthly history and Adventurer's Log milestones, so approximate" : "");
+    + (d.estimated[state.period] ? " &nbsp;·&nbsp; * rough: from before tracking started, so it comes from monthly totals and log milestones" : "");
   $("#rows").innerHTML = rows.map(r => {
     const t = r.t, done = t && t.remaining === 0;
     const now = r.route && r.route.now;
@@ -265,7 +265,7 @@ function renderStatus() {
     ? "hiscores can't find this name, trying again tomorrow"
     : `checked ${ago(p.last_checked_at)}${next != null ? ` · next in ${next} min` : ""}`;
   $("#status").title = "Hiscores only change when you log out or hop worlds.";
-  if (p.history_error === "private") notice(`${p.display_name}'s RuneMetrics profile is private, so their past year of XP can't be imported. Set RuneMetrics to public in game before 10 Nov; it's checked again every hour.`, true);
+  if (p.history_error === "private") notice(`${p.display_name}'s RuneMetrics is private, so their last year of XP can't be pulled in. Set it to public in game before 10 Nov. It's checked again every hour.`, true);
 }
 
 // ---------- charts ----------
@@ -536,7 +536,7 @@ async function renderPlayers() {
   $("#pl-goal").textContent = `At ${state.target}`;
   $("#pl-time").textContent = `Time (${mode})`;
   $("#pl-skill").textContent = skill && sid ? skill : "Pick a skill";
-  $("#players-note").textContent = `XP range ${short(low)} to ${short(top)}. Same goal, ${mode} methods and boosts for everyone.`;
+  $("#players-note").textContent = `${short(low)} to ${short(top)} xp · same goal, ${mode} methods and boosts for everyone`;
   $("#players-rows").innerHTML = rows.map(r => {
     const t = r.sk && r.sk.targets && r.sk.targets[state.target];
     const skillCell = !sid ? '<span class="dim">click a skill above</span>'
@@ -746,7 +746,7 @@ $("#refresh").onclick = async () => {
   try {
     const r = await api(`/api/players/${state.pid}/refresh`, { method: "POST" });
     if (!r.polled) notice(`Checked less than 5 minutes ago. You can update again in ${Math.ceil(r.retry_in / 60)} min.`);
-    else if (r.status === "unavailable") notice("Hiscores didn't respond. The collector will try again shortly.", true);
+    else if (r.status === "unavailable") notice("Hiscores didn't answer. It'll try again in a bit.", true);
     else if (r.status === "not_found") notice("Hiscores can't find this name. Check the spelling or a recent name change.", true);
     else notice("");
     await loadAll();
@@ -783,7 +783,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
       repo = name ? `https://github.com/${location.hostname.split(".")[0]}/${name}` : null;
     } else if (repo === "auto") repo = null;
     // append, don't replace: the (hidden) update/track controls must stay in the page
-    if (repo) $(".actions").insertAdjacentHTML("beforeend", `<a href="${esc(repo)}">Source on GitHub</a>`);
+    if (repo && /^https:\/\//.test(repo)) $(".actions").insertAdjacentHTML("beforeend", `<a href="${esc(repo)}">Source on GitHub</a>`);
   }
   renderControls();
   renderBoostControls();

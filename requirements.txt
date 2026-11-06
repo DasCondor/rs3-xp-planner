@@ -1,2 +1,5 @@
-fastapi>=0.110
-uvicorn>=0.29
+# Exact versions, so every build installs the same code. Bump on purpose.
+fastapi==0.162.0
+starlette==1.10.0
+pydantic==2.14.3
+uvicorn==0.54.0

@@ -36,6 +36,7 @@ MAX_ATTEMPTS = 3
 MAX_BACKOFF_S = 300
 BREAKER_FAILS = 3
 BREAKER_PAUSE_S = 1800
+MAX_BODY = 2_000_000      # bytes; real answers are a few KB, anything bigger is refused
 
 
 class NotFound(Exception):
@@ -65,12 +66,15 @@ _paused_until = 0.0
 def _send(url: str) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
     with _opener.open(req, timeout=TIMEOUT_S) as resp:
-        return resp.read()
+        body = resp.read(MAX_BODY + 1)
+    if len(body) > MAX_BODY:
+        raise ValueError(f"response over {MAX_BODY} bytes")
+    return body
 
 
 def _error_code(exc: urllib.error.HTTPError) -> str:
     try:
-        return json.loads(exc.read().decode("utf-8")).get("error", "")
+        return json.loads(exc.read(MAX_BODY).decode("utf-8")).get("error", "")
     except Exception:
         return ""
 
@@ -115,8 +119,8 @@ def get_json(url: str) -> dict:
                     wait = _backoff(attempt, exc.headers.get("Retry-After"))
                 else:
                     raise Unavailable(f"HTTP {exc.code}; not retrying a client error")
-            except json.JSONDecodeError:
-                raise Unavailable("non-JSON response")
+            except (json.JSONDecodeError, ValueError) as exc:
+                raise Unavailable(f"unusable response: {exc}")
             except (OSError, http.client.HTTPException):
                 wait = _backoff(attempt, None)
             if attempt < MAX_ATTEMPTS:
