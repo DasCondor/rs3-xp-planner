@@ -541,9 +541,12 @@ def test_invention_locked_until_80_crafting_divination_smithing():
         return next(s for s in training.plan(latest, "99", "fastest")["skills"] if s["id"] == INVENTION)
     s = inv(80, 80, 70)
     assert s["locked"] == "Unlocks at 80 Crafting, Divination and Smithing. You have Smithing 70."
-    assert s["hours"] > 0                     # its own training is still counted
+    assert s["segments"] == [] and s["now"] is None and s["hours"] is None   # nothing listed
+    plan = training.plan({**{sid: {"xp": XP_TABLE[80], "level": 80} for sid in range(1, len(SKILLS))},
+                          SKILLS.index("Smithing"): {"xp": XP_TABLE[70], "level": 70}}, "99", "fastest")
+    assert plan["total_hours"] is not None and plan["skills_left"] == 28     # and not in the total
     assert inv(50, 80, 79)["locked"].endswith("You have Crafting 50, Smithing 79.")
-    assert inv(80, 99, 80)["locked"] is None
+    assert inv(80, 99, 80)["locked"] is None and inv(80, 99, 80)["hours"] > 0
 
 
 def test_slayer_creatures_need_the_slayer_level():

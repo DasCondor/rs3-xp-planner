@@ -122,21 +122,24 @@ def plan(latest: dict[int, dict], target: str, mode: str, boosts: dict | None = 
         mult = multiplier(name, boosts, doc)
         goal = target_xp(sid, target)
         lvl_now = row["level"] if sid == INVENTION else virtual_level(sid, row["xp"])
-        r = route(sid, row["xp"], goal, methods, mode, row["level"], mult, allow_expensive)
-        now = best_method(methods, lvl_now, mode, allow_expensive)
-        others = [m for m in methods if not m.get("xp_hr")
-                  or (m.get("expensive") and not allow_expensive)] + locked
-        # Invention opens at 80 in all three. Getting there is already in those skills' own
-        # routes (every goal is past 80), so its hours here start from the unlock.
+        # Invention opens at 80 in all three. Until then nothing is listed for it and it stays
+        # out of the total; getting the three to 80 is already in their own routes.
         lv = lambda n: (latest.get(SKILLS.index(n)) or {}).get("level") or 1
         short_of = [f"{n} {lv(n)}" for n in INVENTION_NEEDS if lv(n) < 80] if sid == INVENTION else []
+        if short_of:
+            r, now, others = {"segments": [], "hours": None}, None, []
+        else:
+            r = route(sid, row["xp"], goal, methods, mode, row["level"], mult, allow_expensive)
+            now = best_method(methods, lvl_now, mode, allow_expensive)
+            others = [m for m in methods if not m.get("xp_hr")
+                      or (m.get("expensive") and not allow_expensive)] + locked
         skills.append({"id": sid, "name": name, "xp": row["xp"], "goal_xp": goal,
                        "remaining": max(goal - row["xp"], 0), "multiplier": round(mult, 4),
                        "now": now and {**now, "boosted_xp_hr": round(now["xp_hr"] * mult)},
                        "locked": short_of and "Unlocks at 80 Crafting, Divination and Smithing. You have "
                                  + ", ".join(short_of) + "." or None,
                        "other_methods": others, **r})
-    open_ = [s for s in skills if s["remaining"] > 0]
+    open_ = [s for s in skills if s["remaining"] > 0 and not s["locked"]]
     return {"target": target, "mode": mode, "boosts": boosts, "allow_expensive": allow_expensive,
             "skills": skills, "skills_left": len(open_),
             "total_hours": None if any(s["hours"] is None for s in open_) else sum(s["hours"] for s in open_)}

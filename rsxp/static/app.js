@@ -109,7 +109,7 @@ function applyBoosts(plan, q, cfg) {
     if (s.hours != null) s.hours = s.segments.reduce((a, g) => a + g.hours, 0);
     if (s.now) s.now.boosted_xp_hr = Math.round(s.now.xp_hr * mult);
   }
-  const open = plan.skills.filter(s => s.remaining > 0);
+  const open = plan.skills.filter(s => s.remaining > 0 && !s.locked);
   plan.total_hours = open.some(s => s.hours == null) ? null : open.reduce((a, s) => a + s.hours, 0);
   plan.boosts = b;
   return plan;
@@ -192,7 +192,7 @@ function renderTable() {
     const pace = r.id === 0 ? "" : isManual
       ? (done ? "" : `<input type="number" min="0" step="1000" data-xphr="${r.id}" value="${manual()[r.id] || ""}" placeholder="xp/hr" aria-label="${esc(r.name)} XP per hour">`)
       : isMethods()
-      ? (done || !now ? "" : r.route.locked ? `<span class="pill warn" title="${esc(r.route.locked)}">locked</span>` : `<span class="method" title="${esc(now.name)} · ${short(now.boosted_xp_hr)} XP/hr · ${hrs(r.route.hours)} to ${state.target}">${esc(now.name)}</span> <span class="dim num">${short(now.boosted_xp_hr)}/h</span>`)
+      ? (done ? "" : r.route?.locked ? `<span class="pill warn" title="${esc(r.route.locked)}">locked</span>` : !now ? "" : `<span class="method" title="${esc(now.name)} · ${short(now.boosted_xp_hr)} XP/hr · ${hrs(r.route.hours)} to ${state.target}">${esc(now.name)}</span> <span class="dim num">${short(now.boosted_xp_hr)}/h</span>`)
       : (r.rate_per_day ? short(r.rate_per_day) : "–");
     return `<tr data-id="${r.id}" class="${r.id === state.skill ? "sel" : ""} ${r.id === 0 ? "overall" : "c-" + (CATEGORY[r.name] || "support")}">
       <td class="sk">${esc(r.name)}</td>
@@ -229,7 +229,8 @@ function renderGoal(rows) {
   const bits = [`At ${state.target}: <b>${29 - open.length}</b> of 29 skills`, `Still to go: <b>${short(remaining)}</b> XP`];
   const plan = isMethods() && state.training[state.window];
   if (plan && plan.total_hours != null)
-    bits.push(`Training time: <b>~${hrs(plan.total_hours)}</b> with the ${state.window} methods${hours() > 0 ? ` (${eta(plan.total_hours / hours() * 7)} at ${hours()} h a week)` : ""}`);
+    bits.push(`Training time: <b>~${hrs(plan.total_hours)}</b> with the ${state.window} methods${hours() > 0 ? ` (${eta(plan.total_hours / hours() * 7)} at ${hours()} h a week)` : ""}`
+      + (plan.skills.some(s => s.locked) ? ", not counting Invention until it's unlocked" : ""));
   else if (!usesHours() && noRate.length)
     bits.push(`No recent XP in ${noRate.map(r => r.name).slice(0, 3).join(", ")}${noRate.length > 3 ? " and more" : ""}, so no finish date`);
   else if (!usesHours() && slowest)
@@ -457,7 +458,7 @@ function renderRoutes() {
       const p = tr[m], open = p.skills.filter(s => s.remaining > 0).sort((a, b) => (b.hours ?? 0) - (a.hours ?? 0));
       return `<div class="route"><h3>${label[m]} <small>${hrs(p.total_hours)} in all${week(p.total_hours)}</small></h3>
         ${open.length ? `<table class="route-sum"><thead><tr><th>Skill</th><th>Start with</th><th class="r">Hours</th></tr></thead><tbody>
-        ${open.map(s => `<tr class="c-${CATEGORY[s.name] || "support"}"><td class="sk">${esc(s.name)}</td><td class="dim"><span class="method">${s.locked ? `<span class="pill warn" title="${esc(s.locked)}">locked</span> ` : ""}${esc(s.now?.name ?? "No method listed")}</span></td><td class="r num">${hrs(s.hours)}</td></tr>`).join("")}
+        ${open.map(s => `<tr class="c-${CATEGORY[s.name] || "support"}"><td class="sk">${esc(s.name)}</td><td class="dim"><span class="method">${s.locked ? `<span class="pill warn" title="${esc(s.locked)}">locked</span>` : esc(s.now?.name ?? "No method listed")}</span></td><td class="r num">${hrs(s.hours)}</td></tr>`).join("")}
         </tbody></table>` : `<p class="empty">Every skill is at ${state.target}.</p>`}
         <p class="hint">Pick a skill in the table for its level-by-level route.</p></div>`;
     }).join("");
@@ -470,6 +471,7 @@ function renderRoutes() {
     const s = tr[m].skills.find(x => x.id === sid);
     if (!s) return `<div class="route"><p class="empty">No Hiscores data for ${esc(name)}.</p></div>`;
     if (!s.remaining) return `<div class="route"><h3>${label[m]}</h3><p class="empty">Already there.</p></div>`;
+    if (s.locked) return `<div class="route"><h3>${label[m]}</h3><p class="lock">${esc(s.locked)} Training shows up here once it's unlocked.</p></div>`;
     const steps = s.segments.map(g => {
       const [eff, cls] = EFFORT[g.effort] || [g.effort, ""];
       const to = g.to_level ?? state.target;
@@ -488,8 +490,7 @@ function renderRoutes() {
       <span class="o-note">${esc(o.locked || o.note || "no published hourly rate")}</span></li>`).join("")
       + (pricey.length ? `<li><span class="o-name">Pricey Options<span class="o-lvl">${pricey.length} method${pricey.length > 1 ? "s" : ""}</span></span>
       <span class="o-note">${pricey.map(o => esc(o.name)).join(", ")} (${short(Math.min(...rates))}${pricey.length > 1 ? `–${short(Math.max(...rates))}` : ""} xp/hr). Tick Pricey Options above to include ${pricey.length > 1 ? "them" : "it"}.</span></li>` : "");
-    const lock = s.locked ? `<p class="lock">${esc(s.locked)} The hours here start once it's open.</p>` : "";
-    return `<div class="route"><h3>${label[m]} <small>${hrs(s.hours)}${week(s.hours)}</small></h3>${lock}${steps ||
+    return `<div class="route"><h3>${label[m]} <small>${hrs(s.hours)}${week(s.hours)}</small></h3>${steps ||
       `<p class="empty">No method in methods.json for level ${s.missing_method_at}.</p>`}
       ${others ? `<div class="others"><h4>Other options, not in the hours above</h4><ul>${others}</ul></div>` : ""}</div>`;
   }).join("") + creaturePick(sid, name);
@@ -543,7 +544,8 @@ async function renderPlayers() {
     const skillCell = !sid ? '<span class="dim">click a skill above</span>'
       : !t ? '<span class="dim">no data</span>'
       : t.remaining === 0 ? `${r.sk.virtual_level} <span class="pill">done</span>`
-      : `${r.sk.virtual_level} · ${short(t.remaining)} left · ${hrs(r.skt?.hours)}${r.skt?.locked ? ' <span class="pill warn">locked</span>' : ""}`;
+      : r.skt?.locked ? `${r.sk.virtual_level} <span class="pill warn" title="${esc(r.skt.locked)}">locked</span>`
+      : `${r.sk.virtual_level} · ${short(t.remaining)} left · ${hrs(r.skt?.hours)}`;
     return `<tr data-pid="${r.p.id}" class="${r.p.id === state.pid ? "sel" : ""}">
       <td><b>${esc(r.p.display_name)}</b></td>
       <td class="r num">${r.o.level ?? "–"}</td>

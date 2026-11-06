@@ -24,8 +24,7 @@ Security pass:
 Also:
 
 - Invention shows as locked until Crafting, Divination and Smithing are all 80, and says which
-  ones are short. Its hours still count, starting from the unlock. The time to get those three
-  to 80 is already in their own routes.
+  ones are short. No Invention training is listed until then, and it's left out of the total.
 - Levels stop at 120 like in game. Hitpoints, Necromancy and a few others were showing up to 126.
 - New players get a year of history: the first time a name is tracked, it pulls their monthly
   XP from RuneMetrics once (until RuneMetrics shuts on 10 Nov 2026). If their profile is
