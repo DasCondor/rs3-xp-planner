@@ -531,6 +531,21 @@ def test_db_path_from_env(monkeypatch, tmp_path):
     assert target.exists()
 
 
+def test_invention_locked_until_80_crafting_divination_smithing():
+    from rsxp import training
+    from rsxp.xp import SKILLS
+    def inv(crafting, divination, smithing):
+        latest = {sid: {"xp": 0, "level": 1} for sid in range(1, len(SKILLS))}
+        for name, lvl in (("Crafting", crafting), ("Divination", divination), ("Smithing", smithing)):
+            latest[SKILLS.index(name)] = {"xp": XP_TABLE[lvl], "level": lvl}
+        return next(s for s in training.plan(latest, "99", "fastest")["skills"] if s["id"] == INVENTION)
+    s = inv(80, 80, 70)
+    assert s["locked"] == "Unlocks at 80 Crafting, Divination and Smithing. You have Smithing 70."
+    assert s["hours"] > 0                     # its own training is still counted
+    assert inv(50, 80, 79)["locked"].endswith("You have Crafting 50, Smithing 79.")
+    assert inv(80, 99, 80)["locked"] is None
+
+
 def test_slayer_creatures_need_the_slayer_level():
     doc = {"boosts": {"outfits": {}, "portables": {}, "double": {"percent": 100}}, "skills": {"Attack": [
         {"level": 1, "name": "basic", "xp_hr": 40_000, "effort": "low"},

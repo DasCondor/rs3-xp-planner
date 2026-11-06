@@ -12,6 +12,8 @@ from pathlib import Path
 
 from .xp import INVENTION, SKILLS, XP_TABLE, target_xp, virtual_level
 
+INVENTION_NEEDS = ("Crafting", "Divination", "Smithing")   # all at 80 to unlock Invention
+
 METHODS_FILE = Path(__file__).resolve().parent / "methods.json"
 MODES = ("fastest", "easiest")
 EFFORT_ORDER = {"afk": 0, "low": 1, "high": 2}
@@ -124,9 +126,15 @@ def plan(latest: dict[int, dict], target: str, mode: str, boosts: dict | None = 
         now = best_method(methods, lvl_now, mode, allow_expensive)
         others = [m for m in methods if not m.get("xp_hr")
                   or (m.get("expensive") and not allow_expensive)] + locked
+        # Invention opens at 80 in all three. Getting there is already in those skills' own
+        # routes (every goal is past 80), so its hours here start from the unlock.
+        lv = lambda n: (latest.get(SKILLS.index(n)) or {}).get("level") or 1
+        short_of = [f"{n} {lv(n)}" for n in INVENTION_NEEDS if lv(n) < 80] if sid == INVENTION else []
         skills.append({"id": sid, "name": name, "xp": row["xp"], "goal_xp": goal,
                        "remaining": max(goal - row["xp"], 0), "multiplier": round(mult, 4),
                        "now": now and {**now, "boosted_xp_hr": round(now["xp_hr"] * mult)},
+                       "locked": short_of and "Unlocks at 80 Crafting, Divination and Smithing. You have "
+                                 + ", ".join(short_of) + "." or None,
                        "other_methods": others, **r})
     open_ = [s for s in skills if s["remaining"] > 0]
     return {"target": target, "mode": mode, "boosts": boosts, "allow_expensive": allow_expensive,

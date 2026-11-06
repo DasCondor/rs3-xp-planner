@@ -210,3 +210,4 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
 @media (max-width:1050px){.charts,.lower{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:800px){.routes{grid-template-columns:minmax(0,1fr)} #player{font-size:32px}}
 @media (prefers-reduced-motion:no-preference){.bar i{transition:width .3s}}
+.route .lock{margin:4px 0 10px;padding:6px 10px;border-left:3px solid var(--warn);background:var(--sel);font-size:14px}
