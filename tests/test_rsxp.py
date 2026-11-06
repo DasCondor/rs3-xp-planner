@@ -40,7 +40,7 @@ def test_virtual_level():
     assert virtual_level(1, 13_034_431) == 99
     assert virtual_level(1, 13_034_430) == 98
     assert virtual_level(1, 0) == 1
-    assert virtual_level(1, MAX_XP) == 126
+    assert virtual_level(1, MAX_XP) == 120 and virtual_level(1, 104_273_167) == 120
     assert virtual_level(INVENTION, 50_000_000, 107) == 107
 
 

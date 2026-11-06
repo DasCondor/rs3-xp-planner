@@ -12,7 +12,7 @@ SKILLS = [
 SKILL_IDS = range(1, len(SKILLS))
 INVENTION = 27
 MAX_XP = 200_000_000
-MAX_VIRTUAL = 126  # highest standard level below 200m XP
+MAX_VIRTUAL = 120  # virtual levels stop at 120 in game (Invention: 150, from the Hiscores)
 
 # XP_TABLE[L] = XP needed for level L on the standard curve.
 XP_TABLE = [0, 0]
@@ -29,7 +29,7 @@ def target_xp(skill_id: int, target: str) -> int:
 
 
 def virtual_level(skill_id: int, xp: int, hiscore_level: int | None = None) -> int | None:
-    """Level from XP, uncapped up to 126. Invention uses the elite curve, which we
+    """Level from XP, virtual up to 120. Invention uses the elite curve, which we
     don't tabulate, so it falls back to the Hiscores level."""
     if skill_id == INVENTION or skill_id == 0 or xp < 0:
         return hiscore_level

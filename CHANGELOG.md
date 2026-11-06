@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Levels stop at 120, as in game. They used to count on to 126 for XP past 120, so skills
+  like Hitpoints and Necromancy could show more than 120.
 - New players get a year of history automatically: the first time a name is tracked, the
   collector fetches its monthly XP from RuneMetrics once, at the usual polite pace. RuneMetrics
   closes on 10 Nov 2026; after that the step is skipped and history builds from hourly snapshots.
