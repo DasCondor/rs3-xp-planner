@@ -25,6 +25,9 @@ USER_AGENT = os.environ.get("RSXP_USER_AGENT") or (
 HISCORES = "https://secure.runescape.com/m=hiscore/index_lite.json"
 EVENTS = "https://secure.runescape.com/m=adventurers-log/api/v1/playerEvents/"
 QUESTS = "https://secure.runescape.com/m=adventurers-log/api/v1/playerQuests/"
+# RuneMetrics closes 10 Nov 2026; until then it is the only source of past XP.
+XP_MONTHLY = "https://apps.runescape.com/runemetrics/xp-monthly"
+PROFILE = "https://apps.runescape.com/runemetrics/profile/profile"
 
 MIN_GAP_S = 5.0
 JITTER_S = 2.0
@@ -134,3 +137,13 @@ def events(name: str) -> dict:
 
 def quests(name: str) -> dict:
     return get_json(QUESTS + urllib.parse.quote(name))
+
+
+def xp_monthly(name: str, skill: int) -> dict:
+    """Twelve months of XP gains for one skill (RuneMetrics numbering: Attack = 0)."""
+    return get_json(f"{XP_MONTHLY}?{urllib.parse.urlencode({'searchName': name, 'skillid': skill})}")
+
+
+def profile(name: str) -> dict:
+    """RuneMetrics profile; {"error": "PROFILE_PRIVATE"} when the player has hidden it."""
+    return get_json(f"{PROFILE}?{urllib.parse.urlencode({'user': name, 'activities': 0})}")

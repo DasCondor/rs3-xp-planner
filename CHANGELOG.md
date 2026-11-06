@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- New players get a year of history automatically: the first time a name is tracked, the
+  collector fetches its monthly XP from RuneMetrics once, at the usual polite pace. RuneMetrics
+  closes on 10 Nov 2026; after that the step is skipped and history builds from hourly snapshots.
+  A private RuneMetrics profile is detected first: the page says so, and it's asked again hourly
+  until the profile is made public.
+- "Players" table when you track two or more names: total level, total XP on a bar scaled to the
+  group's range, this week's gain, skills at the goal, XP to go, and training time with the same
+  goal, pace and boosts applied to everyone. Pick a skill to compare it across players; click a row
+  to switch to that player.
+- The demo shows two players, "Demo Player 1" and "Demo Player 2", so the Players table is
+  visible there. `demo-fixture` takes several names; the fixture format is now version 2.
 - "Your pick" for combat skills: choose from 21 creatures (combat XP per kill from the wiki;
   Slayer locks applied) and enter your kills per hour, to get XP/hr, hours and weeks to the goal.
   Hitpoints gets about a third. The creatures live in one shared table in `methods.json`, which

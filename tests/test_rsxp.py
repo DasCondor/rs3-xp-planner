@@ -101,6 +101,34 @@ def test_history_uses_imported_monthly_rows_and_never_dips(conn):
     assert s["estimated"]["month"] is True and s["history_starts"] == ts(2026, 10, 1)
 
 
+def test_pull_history_once_from_monthly_gains(conn, monkeypatch):
+    pid = db.add_player(conn, "Test")
+    conn.execute("UPDATE players SET status='ok' WHERE id=?", (pid,))
+    asked = []
+    def xp_monthly(name, skill):
+        asked.append(skill)
+        months = [{"xpGain": 1000, "timestamp": ts(2026, 10, 5) * 1000},
+                  {"xpGain": 500, "timestamp": ts(2026, 11, 3) * 1000}]
+        return {"monthlyXpGain": [{"totalXp": 10_000, "monthData": months}]}
+    monkeypatch.setattr(client, "xp_monthly", xp_monthly)
+    monkeypatch.setattr(collector, "poll", lambda *a, **k: "ok")
+    profile = {"error": "PROFILE_PRIVATE"}
+    monkeypatch.setattr(client, "profile", lambda name: profile)
+    collector.run_due(conn, ts(2026, 11, 6))           # private: nothing fetched, noted for the page
+    assert asked == [] and db.get_player(conn, pid)["history_error"] == "private"
+    collector.run_due(conn, ts(2026, 11, 6, 0, 30))    # not retried within the hour
+    profile = {"name": "Test"}                         # made public
+    collector.run_due(conn, ts(2026, 11, 6, 1, 1))
+    collector.run_due(conn, ts(2026, 11, 6, 2))       # already pulled
+    assert asked == [sid - 1 for sid in SKILL_IDS] and db.get_player(conn, pid)["history_error"] is None
+    rows = dict(conn.execute("SELECT s.taken_at, k.xp FROM snapshots s JOIN snapshot_skills k "
+                             "ON k.snapshot_id=s.id WHERE k.skill_id=1").fetchall())
+    assert rows == {ts(2026, 10, 1): 8_500, ts(2026, 11, 1): 9_500, ts(2026, 11, 3): 10_000}
+    # an empty answer later must not wipe what was imported
+    assert db.save_monthly(conn, pid, {1: {"totalXp": 10_000, "monthData": []}}) == 0
+    assert conn.execute("SELECT COUNT(*) FROM snapshots WHERE source='runemetrics'").fetchone()[0] == 3
+
+
 # --- gains ----------------------------------------------------------------
 
 def test_gain_and_partial():
@@ -353,21 +381,26 @@ def test_demo_fixture_round_trip_and_site(conn, tmp_path):
     db.save_quests(conn, pid, {"qp": 3, "qp_max": 5, "quests": {"1": {"title": "Cold Front", "difficulty": 0,
         "members": False, "qp": 1, "eligible": True, "status": "COMPLETED"}}}, now=ts(2026, 11, 4))
 
+    other = db.add_player(conn, "Other Secret")
+    db.save_hiscores(conn, other, hiscores_payload({sid: 2_000 for sid in range(30)}), now=ts(2026, 11, 3))
+
     fx = tmp_path / "fixture.json"
-    demo.dump_fixture(conn, "Secret Name", fx)
+    demo.dump_fixture(conn, ["Secret Name", "Other Secret"], fx)
     assert "secret" not in fx.read_text(encoding="utf-8").lower()
 
     # the fixture rebuilds the same numbers as the real database
-    conn2, name, now = demo.load_fixture(fx)
-    assert name == "Demo Player" and now == ts(2026, 11, 4)
-    pid2 = db.get_player(conn2, name)["id"]
+    conn2, now = demo.load_fixture(fx)
+    assert [p["display_name"] for p in db.players(conn2)] == ["Demo Player 1", "Demo Player 2"]
+    assert now == ts(2026, 11, 4)
+    pid2 = db.get_player(conn2, "Demo Player 1")["id"]
     a = planner.summary(conn, pid, now, 30)["skills"]
     b = planner.summary(conn2, pid2, now, 30)["skills"]
     assert [(s["xp"], s["gains"]) for s in a] == [(s["xp"], s["gains"]) for s in b]
 
     site = tmp_path / "site"
-    n = demo.build_site(conn2, name, site, now=now)
-    assert n == len(list((site / "data").glob("*.json"))) == 52
+    n = demo.build_site(conn2, site, now=now)
+    assert n == len(list((site / "data").glob("*.json"))) == 3 + 2 * 49   # shared + per player
+    assert json.loads((site / "data" / "p2-summary-30.json").read_text())["skills"][1]["xp"] == 2_000
     for asset in ("index.html", "app.css", "app.js", "theme.js", "logo.svg"):
         assert (site / asset).exists(), asset
     assert "window.RSXP_STATIC" in (site / "index.html").read_text(encoding="utf-8")

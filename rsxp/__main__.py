@@ -41,9 +41,8 @@ def main(argv=None):
     p.add_argument("name")
     p.add_argument("--target", choices=["99", "120", "200m"], default="120")
     p.add_argument("--window", type=int, choices=planner.RATE_WINDOWS, default=30)
-    p = sub.add_parser("demo-fixture", help="save one player's data as the demo fixture (renamed)")
-    p.add_argument("name")
-    p.add_argument("--as", dest="display_as", default="Demo Player", help='name shown in the demo (default "Demo Player")')
+    p = sub.add_parser("demo-fixture", help='save players as the demo fixture, renamed "Demo Player N"')
+    p.add_argument("names", nargs="+")
     p.add_argument("--out", default=None, help="default: demo/fixture.json")
     p = sub.add_parser("build-demo", help="build the static demo site from the fixture (CI does this)")
     p.add_argument("--fixture", default=None, help="default: demo/fixture.json")
@@ -59,8 +58,8 @@ def main(argv=None):
 
     if args.cmd == "build-demo":
         from . import demo
-        conn, name, now = demo.load_fixture(Path(args.fixture) if args.fixture else demo.FIXTURE)
-        n = demo.build_site(conn, name, Path(args.out), args.repo, now)
+        conn, now = demo.load_fixture(Path(args.fixture) if args.fixture else demo.FIXTURE)
+        n = demo.build_site(conn, Path(args.out), args.repo, now)
         print(f"built {Path(args.out) / 'index.html'} with {n} data files")
         return
 
@@ -82,9 +81,9 @@ def main(argv=None):
         elif args.cmd == "demo-fixture":
             from . import demo
             out = Path(args.out) if args.out else demo.FIXTURE
-            f = demo.dump_fixture(conn, args.name, out, args.display_as)
-            print(f"wrote {out} ({out.stat().st_size // 1024} KB: {len(f['snapshots'])} snapshots, "
-                  f"{len(f['events'])} events, {len(f['quests'])} quests)")
+            f = demo.dump_fixture(conn, args.names, out)
+            print(f"wrote {out} ({out.stat().st_size // 1024} KB; " + ", ".join(
+                f"{p['player']['display_name']}: {len(p['snapshots'])} snapshots" for p in f["players"]) + ")")
         elif args.cmd == "plan":
             player = need_player(conn, args.name)
             s = planner.summary(conn, player["id"], int(time.time()), args.window)

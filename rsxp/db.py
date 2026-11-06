@@ -83,7 +83,7 @@ def connect(path: Path | str = DEFAULT_DB) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
     have = {r["name"] for r in conn.execute("PRAGMA table_info(players)")}
-    for col in ("qp", "qp_max", "last_quests_at"):
+    for col in ("qp", "qp_max", "last_quests_at", "history_at", "history_error"):
         if col not in have:
             conn.execute(f"ALTER TABLE players ADD COLUMN {col} INTEGER")
     conn.commit()
@@ -232,3 +232,36 @@ def save_events(conn, pid: int, data: dict) -> int:
         "INSERT OR IGNORE INTO events(player_id, date, type, text, details) VALUES (?,?,?,?,?)", rows)
     conn.commit()
     return cur.rowcount
+
+
+def save_monthly(conn, pid: int, entries: dict[int, dict]) -> int:
+    """Turn RuneMetrics xp-monthly answers ({skill id: monthlyXpGain[0]}) into cumulative-XP
+    snapshots at each month start: XP at month m = current total - gains of months >= m.
+    Replaces any earlier import. Returns snapshots written."""
+    per_skill, fetched_at = {}, 0
+    for sid, entry in entries.items():
+        gains = {}
+        for m in entry.get("monthData", []):
+            ts = int(m["timestamp"] / 1000)
+            fetched_at = max(fetched_at, ts)
+            d = datetime.fromtimestamp(ts, tz=timezone.utc)
+            month = int(datetime(d.year, d.month, 1, tzinfo=timezone.utc).timestamp())
+            gains[month] = gains.get(month, 0) + int(m["xpGain"])
+        per_skill[sid] = (int(entry["totalXp"]), gains)
+    points = {fetched_at: {sid: total for sid, (total, _) in per_skill.items()}} if fetched_at else {}
+    for m in sorted({m for _, g in per_skill.values() for m in g}):
+        points[m] = {sid: total - sum(v for k, v in g.items() if k >= m) for sid, (total, g) in per_skill.items()}
+    if len(points) < 2:
+        return 0   # no months came back: keep whatever was imported before
+
+    conn.execute("DELETE FROM snapshot_skills WHERE snapshot_id IN "
+                 "(SELECT id FROM snapshots WHERE player_id=? AND source='runemetrics')", (pid,))
+    conn.execute("DELETE FROM snapshots WHERE player_id=? AND source='runemetrics'", (pid,))
+    for ts, xps in sorted(points.items()):
+        cur = conn.execute("INSERT INTO snapshots(player_id, taken_at, seen_until, source) "
+                           "VALUES (?,?,?,'runemetrics')", (pid, ts, ts))
+        rows = [(cur.lastrowid, sid, xp, None, None) for sid, xp in xps.items()]
+        rows.append((cur.lastrowid, 0, sum(xps.values()), None, None))
+        conn.executemany("INSERT INTO snapshot_skills VALUES (?,?,?,?,?)", rows)
+    conn.commit()
+    return len(points)

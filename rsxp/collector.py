@@ -4,6 +4,7 @@ import threading
 import time
 
 from . import client, db
+from .xp import SKILL_IDS
 
 POLL_S = 3600            # normal Hiscores poll interval per player
 NOT_FOUND_S = 86400      # retry a missing player once a day
@@ -11,6 +12,7 @@ EVENTS_S = 1800          # Player Events: endpoint caches 10 min, we ask every 3
 QUESTS_S = 6 * 3600      # Player Quests: changes rarely
 REFRESH_MIN_S = 300      # "Update now" at most once per 5 minutes per player
 TICK_S = 60
+RUNEMETRICS_CLOSES = 1794268800   # 10 Nov 2026 00:00 UTC; no point asking after that
 
 log = logging.getLogger("rsxp.collector")
 
@@ -59,12 +61,42 @@ def _extra(conn, player, now, column, interval, fetch, save) -> None:
     conn.commit()
 
 
+def pull_history(conn, player, now: int | None = None) -> int:
+    """Once per player: a year of monthly XP from RuneMetrics (a privacy check, then 29
+    requests at the polite pace). Returns snapshots saved. Retried next tick if the API was
+    down, hourly while the profile is private."""
+    now = now or int(time.time())
+    n, error = 0, None
+    if now < RUNEMETRICS_CLOSES:
+        log.info("%s: fetching a year of monthly XP from RuneMetrics", player["display_name"])
+        try:
+            if client.profile(player["display_name"]).get("error") == "PROFILE_PRIVATE":
+                error = "private"   # asked again hourly, in case they make it public
+            else:
+                n = db.save_monthly(conn, player["id"], {
+                    sid: client.xp_monthly(player["display_name"], sid - 1)["monthlyXpGain"][0] for sid in SKILL_IDS})
+        except client.Unavailable as exc:
+            log.warning("history unavailable for %s: %s", player["display_name"], exc)
+            return 0
+        except (client.NotFound, client.NotMember, KeyError, IndexError, TypeError):
+            pass   # no RuneMetrics profile for this name: nothing to import
+    conn.execute("UPDATE players SET history_at=?, history_error=? WHERE id=?", (now, error, player["id"]))
+    conn.commit()
+    log.info("%s: %s", player["display_name"],
+             "RuneMetrics profile is private" if error else f"{n} monthly history points")
+    return n
+
+
 def run_due(conn, now: int | None = None) -> int:
     now = now or int(time.time())
     due = conn.execute("SELECT * FROM players WHERE next_check_at <= ? ORDER BY next_check_at",
                        (now,)).fetchall()
     for p in due:
         poll(conn, p)
+    new = conn.execute("SELECT * FROM players WHERE status='ok' AND (history_at IS NULL OR "
+                       "(history_error='private' AND history_at < ?)) LIMIT 1", (now - POLL_S,)).fetchone()
+    if new:
+        pull_history(conn, new, now)
     return len(due)
 
 

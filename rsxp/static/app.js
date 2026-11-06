@@ -118,16 +118,17 @@ async function staticApi(path, opts) {
   if (opts.method && opts.method !== "GET")
     throw new Error("This is a read-only demo. Run the planner on your own PC to track players and update stats.");
   const u = new URL(path, "http://demo"), p = u.pathname, q = u.searchParams;
+  const pid = (p.match(/^\/api\/players\/(\d+)\//) || [])[1], pre = pid ? `p${pid}-` : "";
   if (p === "/api/players") return staticJson("players");
   if (p === "/api/training/boosts") return (await staticJson("boosts")).boosts;
   if (p === "/api/training/creatures") return staticJson("creatures");
-  if (p.endsWith("/summary")) return staticJson(`summary-${q.get("window")}`);
-  if (/\/skills\/\d+$/.test(p)) return staticJson(`skill-${p.split("/").pop()}`);
+  if (p.endsWith("/summary")) return staticJson(`${pre}summary-${q.get("window")}`);
+  if (/\/skills\/\d+$/.test(p)) return staticJson(`${pre}skill-${p.split("/").pop()}`);
   if (p.endsWith("/training")) {
-    const plan = await staticJson(`training-${q.get("target")}-${q.get("mode")}-${q.get("expensive") === "true" ? "all" : "std"}`);
+    const plan = await staticJson(`${pre}training-${q.get("target")}-${q.get("mode")}-${q.get("expensive") === "true" ? "all" : "std"}`);
     return applyBoosts(plan, q, await staticJson("boosts"));
   }
-  for (const name of ["events", "activities", "quests"]) if (p.endsWith("/" + name)) return staticJson(name);
+  for (const name of ["events", "activities", "quests"]) if (p.endsWith("/" + name)) return staticJson(pre + name);
   throw new Error("Not available in the demo: " + p);
 }
 async function api(path, opts = {}) {
@@ -264,6 +265,7 @@ function renderStatus() {
     ? "hiscores can't find this name, trying again tomorrow"
     : `checked ${ago(p.last_checked_at)}${next != null ? ` · next in ${next} min` : ""}`;
   $("#status").title = "Hiscores only change when you log out or hop worlds.";
+  if (p.history_error === "private") notice(`${p.display_name}'s RuneMetrics profile is private, so their past year of XP can't be imported. Set RuneMetrics to public in game before 10 Nov; it's checked again every hour.`, true);
 }
 
 // ---------- charts ----------
@@ -324,6 +326,7 @@ async function loadSkill(sid) {
   state.skill = sid;
   document.querySelectorAll("#rows tr").forEach(tr => tr.classList.toggle("sel", Number(tr.dataset.id) === sid));
   renderRoutes();
+  renderPlayers();
   const h = await api(`/api/players/${state.pid}/skills/${sid}`);
   $("#skill-title").textContent = h.skill;
   if (!window.Chart) { $(".charts").innerHTML = '<p class="empty">Charts need an internet connection to load Chart.js.</p>'; return; }
@@ -513,6 +516,49 @@ function creaturePick(sid, name) {
       : `<p class="dim">Choose a creature and enter how many you kill an hour.</p>`}</div>`;
 }
 
+// ---------- players: the same goal, pace and boosts applied to everyone tracked ----------
+let playersRun = 0;
+async function renderPlayers() {
+  const ps = state.players || [], run = ++playersRun;
+  $("#players-sec").hidden = ps.length < 2 || !state.data;
+  if ($("#players-sec").hidden) return;
+  const mode = MODES.includes(state.window) ? state.window : "fastest";
+  const sid = state.skill, skill = (state.data.skills.find(s => s.id === sid) || {}).name;
+  const rows = await Promise.all(ps.map(async p => {
+    const [sum, tr] = await Promise.all([api(`/api/players/${p.id}/summary?window=30`),
+      api(`/api/players/${p.id}/training?target=${state.target}&mode=${mode}&${boostQuery()}`)]);
+    const o = sum.skills[0], open = sum.skills.filter(s => s.targets && s.targets[state.target].remaining > 0);
+    const sk = sid ? sum.skills.find(s => s.id === sid) : null, skt = sid ? tr.skills.find(s => s.id === sid) : null;
+    return { p, o, open, sk, skt, hours: tr.total_hours };
+  }));
+  if (run !== playersRun) return;   // a newer redraw started while this one was loading
+  const top = Math.max(...rows.map(r => r.o.xp || 0)), low = Math.min(...rows.map(r => r.o.xp || 0));
+  $("#pl-goal").textContent = `At ${state.target}`;
+  $("#pl-time").textContent = `Time (${mode})`;
+  $("#pl-skill").textContent = skill && sid ? skill : "Pick a skill";
+  $("#players-note").textContent = `XP range ${short(low)} to ${short(top)}. Same goal, ${mode} methods and boosts for everyone.`;
+  $("#players-rows").innerHTML = rows.map(r => {
+    const t = r.sk && r.sk.targets && r.sk.targets[state.target];
+    const skillCell = !sid ? '<span class="dim">click a skill above</span>'
+      : !t ? '<span class="dim">no data</span>'
+      : t.remaining === 0 ? `${r.sk.virtual_level} <span class="pill">done</span>`
+      : `${r.sk.virtual_level} · ${short(t.remaining)} left · ${hrs(r.skt?.hours)}`;
+    return `<tr data-pid="${r.p.id}" class="${r.p.id === state.pid ? "sel" : ""}">
+      <td><b>${esc(r.p.display_name)}</b></td>
+      <td class="r num">${r.o.level ?? "–"}</td>
+      <td class="num"><span class="bar xp"><i style="width:${top ? (r.o.xp / top) * 100 : 0}%"></i></span> ${short(r.o.xp)}</td>
+      <td class="r num">${r.o.gains.week ? "+" + short(r.o.gains.week) : "0"}</td>
+      <td class="r num">${29 - r.open.length}/29</td>
+      <td class="r num">${short(r.open.reduce((a, s) => a + s.targets[state.target].remaining, 0))}</td>
+      <td class="r num">${r.hours === 0 ? '<span class="pill">done</span>' : hrs(r.hours)}${hours() > 0 && r.hours ? ` <span class="dim">(${eta(r.hours / hours() * 7)})</span>` : ""}</td>
+      <td class="num">${skillCell}</td></tr>`;
+  }).join("");
+}
+$("#players-rows").onclick = e => {
+  const tr = e.target.closest("tr[data-pid]"); if (!tr || Number(tr.dataset.pid) === state.pid) return;
+  $("#player").value = tr.dataset.pid; $("#player").dispatchEvent(new Event("change"));
+};
+
 // ---------- activities, quests, events ----------
 function renderActivities() {
   $("#act-gain").textContent = periodLabel();
@@ -597,7 +643,7 @@ function renderControls() {
   $("#pace").value = String(state.window);
   $("#pace").onchange = e => {
     const v = isNaN(e.target.value) ? e.target.value : Number(e.target.value);
-    state.window = v; store.set("window", v); $("#hours-ctl").hidden = !usesHours(); loadSummary();
+    state.window = v; store.set("window", v); $("#hours-ctl").hidden = !usesHours(); loadSummary().then(renderPlayers);
   };
   seg($("#seg-period"), PERIODS, state.period, v => { state.period = v; store.set("period", v); renderTable(); renderBySkill(); renderActivities(); });
   $("#hours-ctl").hidden = !usesHours();
@@ -623,6 +669,7 @@ async function loadPlayers(selectId) {
     return false;
   }
   sel.hidden = false; $("#refresh").hidden = false;
+  state.players = ps;
   sel.innerHTML = ps.map(p => `<option value="${p.id}">${esc(p.display_name)}</option>`).join("");
   const want = selectId ?? state.pid;
   state.pid = ps.some(p => p.id === want) ? want : ps[0].id;
@@ -655,7 +702,7 @@ $("#boosts").addEventListener("change", async () => {
   store.set("boosts", { avatar: Number($("#b-avatar").value), outfits: picked("outfits"), portables: picked("portables"),
     double: $("#b-double").checked, expensive: $("#b-expensive").checked });
   renderBoostControls();
-  try { await loadTraining(); renderTable(); renderRoutes(); } catch (e) { notice(e.message, true); }
+  try { await loadTraining(); renderTable(); renderRoutes(); renderPlayers(); } catch (e) { notice(e.message, true); }
 });
 $("#boosts").addEventListener("click", e => {
   const b = e.target.closest("[data-kit-all]"); if (!b) return;

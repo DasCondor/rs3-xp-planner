@@ -5,7 +5,7 @@
 # rs3-xp-planner
 
 **Your RuneScape 3 XP history, and how far every skill is from 99, 120 and 200m.**
-<br>Self-hosted, and built only on Jagex's new RuneScape Platform API.
+<br>Self-hosted, and built on Jagex's new RuneScape Platform API.
 
 [![tests](../../actions/workflows/tests.yml/badge.svg)](../../actions/workflows/tests.yml)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
@@ -177,10 +177,10 @@ flowchart LR
   and every level-up is an exact XP point with a timestamp. That gives each skill some
   history from before you started tracking. These gains are marked `*`, because the log
   only keeps your latest events and sometimes batches level-ups.
-- **Monthly history you already saved (optional).** If your database has month-start
-  totals saved from RuneMetrics before it closed on 10 Nov 2026, they're used too. That
-  gives up to a year of history. They're read from your local file, never fetched, and are
-  approximate inside each month.
+- **A year of monthly history.** The first time a name is tracked, it asks RuneMetrics
+  once for that player's monthly XP (29 requests at the same polite pace). That gives
+  up to a year of history, approximate inside each month. RuneMetrics closes on
+  10 Nov 2026; after that this is skipped, and anything already saved keeps being used.
 
 **Where the ETAs come from:** your own recent pace, the training routes, or an XP/hr you
 type in. You pick which on the page.
@@ -208,7 +208,7 @@ python -m rsxp serve [--port 8765]         dashboard + hourly collector
 python -m rsxp add "Name"                  track a player
 python -m rsxp poll ["Name"]               check Hiscores now
 python -m rsxp plan "Name" --target 120    print the plan in the terminal
-python -m rsxp demo-fixture "Name"         refresh demo/fixture.json (shown as "Demo Player")
+python -m rsxp demo-fixture "Name" ...     refresh demo/fixture.json (shown as "Demo Player 1", "2", ...)
 python -m rsxp build-demo                  build the demo site into _site/ (CI does this)
 ```
 

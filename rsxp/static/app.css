@@ -52,7 +52,7 @@ form.add input{width:150px}
   font:700 40px/1.05 var(--f-head);letter-spacing:-.005em;cursor:pointer;max-width:100%;
   background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
   background-position:right 6px top 58%,right 0 top 58%;background-size:6px 6px;background-repeat:no-repeat}
-#player option{font-size:16px}
+#player option{font-size:16px;background:var(--panel);color:var(--ink)}
 .totals{margin:4px 0 0;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 22px}
 .totals b{color:var(--ink);font-weight:600}
 .gains{margin:0;display:flex;flex-wrap:wrap;gap:12px 44px}
@@ -91,6 +91,9 @@ th[data-sort]:hover{color:var(--ink)}
 .skills tbody tr.sel{background:var(--sel)}
 tr.overall td{font-weight:600;border-bottom:1px solid var(--line)}
 .foot{margin:8px 0 0;font-size:13px;color:var(--muted)}
+.players tbody tr{cursor:pointer}
+.players tbody tr:hover,.players tbody tr.sel{background:var(--sel)}
+.bar.xp{width:120px}
 .bar{width:150px;height:5px;background:var(--track);display:inline-block;vertical-align:middle}
 .bar i{display:block;height:100%;background:var(--c,var(--accent))}
 .bar.done i{background:var(--good)}
