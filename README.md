@@ -14,7 +14,7 @@
 ![No API key](https://img.shields.io/badge/API%20key-not%20needed-a8790f)
 ![MIT](https://img.shields.io/badge/license-MIT-555)
 
-[**Live demo**](../../deployments/github-pages) &nbsp;·&nbsp; [Quick start](#quick-start) &nbsp;·&nbsp; [Features](#features) &nbsp;·&nbsp; [How it works](#how-it-works) &nbsp;·&nbsp; [FAQ](#faq)
+[**Live demo**](https://dascondor.github.io/rs3-xp-planner/) &nbsp;·&nbsp; [Quick start](#quick-start) &nbsp;·&nbsp; [Features](#features) &nbsp;·&nbsp; [How it works](#how-it-works) &nbsp;·&nbsp; [FAQ](#faq)
 
 <br>
 
